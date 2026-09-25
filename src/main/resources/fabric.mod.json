@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "cobbleroguelike",
+  "version": "${version}",
+  "name": "CobbleRogueLike",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/cobbleroguelike/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-datagen": [
+      "org.CobbleUtils.cobbleroguelike.client.CobbleroguelikeDataGenerator"
+    ],
+    "client": [
+      "org.CobbleUtils.cobbleroguelike.client.CobbleroguelikeClient"
+    ],
+    "main": [
+      "org.CobbleUtils.cobbleroguelike.Cobbleroguelike"
+    ]
+  },
+  "mixins": [
+    "cobbleroguelike.mixins.json",
+    {
+      "config": "cobbleroguelike.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
