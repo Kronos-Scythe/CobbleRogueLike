@@ -1,5 +1,6 @@
 package org.CobbleUtils.cobbleroguelike.run;
 
+import com.cobblemon.mod.common.api.battles.model.PokemonBattle;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
@@ -11,6 +12,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import org.CobbleUtils.cobbleroguelike.Cobbleroguelike;
 import org.CobbleUtils.cobbleroguelike.RogueConfig;
+import org.CobbleUtils.cobbleroguelike.compat.CobblemonBattles;
 import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
 import org.CobbleUtils.cobbleroguelike.run.RunState.NodeType;
 import org.CobbleUtils.cobbleroguelike.run.RunState.Phase;
@@ -205,6 +207,10 @@ public final class RunManager {
             message(player, "Finish your battle before ending the run.", Formatting.RED);
             return;
         }
+        finish(player, reason);
+    }
+
+    private void finish(ServerPlayerEntity player, String reason) {
         try {
             restore(player);
             message(player, reason + " Your party has been restored.", Formatting.GOLD);
@@ -295,10 +301,15 @@ public final class RunManager {
             RogueMenus.hub(player, false);
             return;
         }
+        if (CobblemonBridge.isInBattle(player)) {
+            message(player, "Finish your battle first.", Formatting.RED);
+            return;
+        }
         switch (state.phase) {
             case CHOOSE_NODE -> RogueMenus.path(player, state);
             case ENCOUNTER -> RogueMenus.encounter(player, state);
             case RELEASE -> RogueMenus.release(player, state);
+            case BATTLE -> RogueMenus.battle(player, state);
         }
     }
 
@@ -317,9 +328,91 @@ public final class RunManager {
                 message(player, "Your team rested and is fully healed.", Formatting.GREEN);
                 advanceFloor(state);
             }
+            case TRAINER, GYM, CHAMPION -> {
+                TrainerGenerator.prepare(state, state.nodeChoices.get(index), rng(state, 10 + index));
+                state.phase = Phase.BATTLE;
+            }
         }
         save(player, state);
         openCurrent(player);
+    }
+
+    /** Starts the prepared battle. The outcome arrives later through {@link #onBattleEnded}. */
+    public void startBattle(ServerPlayerEntity player) {
+        RunState state = requirePhase(player, Phase.BATTLE);
+        if (state == null) {
+            return;
+        }
+        if (CobblemonBridge.isInBattle(player)) {
+            message(player, "You're already in a battle.", Formatting.RED);
+            return;
+        }
+        List<Pokemon> team = new ArrayList<>();
+        for (String properties : state.battleTeam) {
+            team.add(CobblemonBridge.create(properties));
+        }
+        PokemonBattle battle = CobblemonBattles.startTrainerBattle(player, state.battleName, team, state.battleSkill);
+        if (battle == null) {
+            message(player, "The battle couldn't start. Is your lead Pokémon able to fight?", Formatting.RED);
+            return;
+        }
+        player.closeHandledScreen();
+        UUID playerId = player.getUuid();
+        // End handlers can run mid-teardown; handle the result on the next tick instead.
+        CobblemonBattles.onEnd(battle, ended -> {
+            Boolean won = CobblemonBattles.playerWon(ended, playerId);
+            server.execute(() -> onBattleEnded(playerId, won));
+        });
+    }
+
+    /**
+     * {@code won == null} means the battle was interrupted (e.g. a disconnect). The same trainer
+     * can be challenged again, and damage taken so far carries over. A loss or forfeit ends the run.
+     */
+    private void onBattleEnded(UUID playerId, Boolean won) {
+        ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
+        RunState state = active.get(playerId);
+        if (player == null || state == null || state.phase != Phase.BATTLE) {
+            return;
+        }
+        if (won == null) {
+            message(player, "The battle was interrupted. Use /rogue to challenge again.", Formatting.YELLOW);
+            return;
+        }
+        if (!won) {
+            finish(player, "You blacked out on floor " + state.floor + " with " + state.badges + " badge"
+                    + (state.badges == 1 ? "" : "s") + ". Your run is over.");
+            return;
+        }
+        switch (state.battleKind) {
+            case CHAMPION -> {
+                finish(player, "You defeated " + state.battleName + "! Your run is complete!");
+                return;
+            }
+            case GYM -> {
+                state.badges++;
+                state.usedGymTypes.add(state.battleType);
+                message(player, "You defeated " + state.battleName + " and earned badge " + state.badges
+                        + "! Level cap is now " + Scaling.levelCap(state.badges) + ".", Formatting.GOLD);
+                if (RogueConfig.get().healAfterGym) {
+                    CobblemonBridge.healParty(player);
+                }
+            }
+            default -> message(player, "You defeated " + state.battleName + "!", Formatting.GREEN);
+        }
+        state.clearBattle();
+        advanceFloor(state);
+        save(player, state);
+        openCurrent(player);
+    }
+
+    /** Current run level cap for a player, or -1 if they aren't in a run. */
+    public static int levelCap(ServerPlayerEntity player) {
+        if (instance == null) {
+            return -1;
+        }
+        RunState state = instance.active.get(player.getUuid());
+        return state == null ? -1 : Scaling.levelCap(state.badges);
     }
 
     /** Picks one of the route's Pokémon, like Emerald Rogue's one catch per route. {@code -1} skips. */
@@ -398,8 +491,7 @@ public final class RunManager {
 
     private static List<String> rollEncounters(RunState state) {
         RogueConfig config = RogueConfig.get();
-        int level = Math.min(config.maxEncounterLevel,
-                config.starterLevel + state.floor * config.encounterLevelPerFloor);
+        int level = Scaling.encounterLevel(state);
         List<String> result = new ArrayList<>();
         for (String species : pickDistinct(config.encounterPool, config.encounterOptions, rng(state, 2))) {
             result.add(species + " level=" + level);
@@ -408,12 +500,24 @@ public final class RunManager {
     }
 
     private static List<NodeType> rollNodes(RunState state) {
+        if (Scaling.isBossFloor(state.floor)) {
+            return new ArrayList<>(List.of(Scaling.championUnlocked(state.badges) ? NodeType.CHAMPION : NodeType.GYM));
+        }
+        RogueConfig config = RogueConfig.get();
         Random random = rng(state, 3);
+        double total = Math.max(1e-9, config.trainerWeight + config.routeWeight + config.restWeight);
         List<NodeType> nodes = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
-            nodes.add(random.nextDouble() < RogueConfig.get().restChance ? NodeType.REST : NodeType.ROUTE);
+            double roll = random.nextDouble() * total;
+            if (roll < config.trainerWeight) {
+                nodes.add(NodeType.TRAINER);
+            } else if (roll < config.trainerWeight + config.routeWeight) {
+                nodes.add(NodeType.ROUTE);
+            } else {
+                nodes.add(NodeType.REST);
+            }
         }
-        if (!nodes.contains(NodeType.ROUTE)) {
+        if (nodes.stream().allMatch(node -> node == NodeType.REST)) {
             nodes.set(random.nextInt(nodes.size()), NodeType.ROUTE);
         }
         return nodes;

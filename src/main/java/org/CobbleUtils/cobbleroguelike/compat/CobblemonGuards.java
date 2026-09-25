@@ -2,6 +2,7 @@ package org.CobbleUtils.cobbleroguelike.compat;
 
 import com.cobblemon.mod.common.api.Priority;
 import com.cobblemon.mod.common.api.events.CobblemonEvents;
+import com.cobblemon.mod.common.pokemon.Pokemon;
 import net.minecraft.entity.Entity;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Formatting;
@@ -15,7 +16,7 @@ public final class CobblemonGuards {
 
     public static void register() {
         // Outside battles would give rogue Pokémon free EXP and let players catch into the run.
-        // Run battles will be started by the mod itself and allowed through here (next milestone).
+        // Run battles are started with canPreempt = false, so they never reach this listener.
         CobblemonEvents.BATTLE_STARTED_PRE.subscribe(Priority.NORMAL, event -> {
             for (ServerPlayerEntity player : event.getBattle().getPlayers()) {
                 if (RunManager.isInRun(player)) {
@@ -32,6 +33,27 @@ public final class CobblemonGuards {
             if (owner instanceof ServerPlayerEntity player && RunManager.isInRun(player)) {
                 event.cancel();
                 RunManager.message(player, "You can't catch Pokémon while a run is active.", Formatting.RED);
+            }
+        });
+
+        // Run level cap: rogue Pokémon can't gain EXP past the next boss's level.
+        CobblemonEvents.EXPERIENCE_GAINED_EVENT_PRE.subscribe(Priority.NORMAL, event -> {
+            Pokemon pokemon = event.getPokemon();
+            if (!CobblemonBridge.isRogue(pokemon)) {
+                return;
+            }
+            ServerPlayerEntity owner = pokemon.getOwnerPlayer();
+            int cap = owner == null ? -1 : RunManager.levelCap(owner);
+            if (cap < 0) {
+                return;
+            }
+            if (pokemon.getLevel() >= cap) {
+                event.cancel();
+                return;
+            }
+            int room = pokemon.getExperienceGroup().getExperience(cap) - pokemon.getExperience();
+            if (event.getExperience() > room) {
+                event.setExperience(Math.max(0, room));
             }
         });
 

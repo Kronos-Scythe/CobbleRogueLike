@@ -5,6 +5,8 @@ import com.cobblemon.mod.common.api.pokemon.PokemonProperties;
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
 import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore;
 import com.cobblemon.mod.common.api.storage.pc.PCStore;
+import com.cobblemon.mod.common.api.types.ElementalType;
+import com.cobblemon.mod.common.api.types.ElementalTypes;
 import com.cobblemon.mod.common.battles.BattleRegistry;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.item.PokemonItem;
@@ -87,6 +89,53 @@ public final class CobblemonBridge {
 
     public static boolean speciesExists(String name) {
         return PokemonSpecies.INSTANCE.getByName(name) != null;
+    }
+
+    /** Creates an untracked Pokémon (e.g. for a trainer's team) from a property string. */
+    public static Pokemon create(String properties) {
+        return PokemonProperties.Companion.parse(properties).create();
+    }
+
+    private static final Set<String> SPECIAL_LABELS = Set.of("legendary", "mythical", "ultra_beast", "paradox", "restricted");
+
+    /**
+     * Implemented species ids with a base stat total within {@code [minBst, maxBst]}, optionally
+     * of one type. Legendaries, mythicals, Ultra Beasts and paradoxes are excluded unless allowed.
+     */
+    public static List<String> speciesPool(String typeName, int minBst, int maxBst, boolean allowLegendary) {
+        List<String> result = new ArrayList<>();
+        for (Species species : PokemonSpecies.INSTANCE.getImplemented()) {
+            if (!allowLegendary && species.getLabels().stream().anyMatch(SPECIAL_LABELS::contains)) {
+                continue;
+            }
+            int bst = species.getBaseStats().values().stream().mapToInt(Integer::intValue).sum();
+            if (bst < minBst || bst > maxBst) {
+                continue;
+            }
+            if (typeName != null && !hasType(species, typeName)) {
+                continue;
+            }
+            result.add(species.getResourceIdentifier().getPath());
+        }
+        return result;
+    }
+
+    private static boolean hasType(Species species, String typeName) {
+        for (ElementalType type : species.getTypes()) {
+            if (type.getName().equalsIgnoreCase(typeName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Lowercase names of all elemental types, e.g. {@code "fire"}. */
+    public static List<String> typeNames() {
+        List<String> names = new ArrayList<>();
+        for (ElementalType type : ElementalTypes.all()) {
+            names.add(type.getName().toLowerCase(java.util.Locale.ROOT));
+        }
+        return names;
     }
 
     /** Creates a rogue-tagged Pokémon from a property string such as {@code "mudkip level=5"}. */

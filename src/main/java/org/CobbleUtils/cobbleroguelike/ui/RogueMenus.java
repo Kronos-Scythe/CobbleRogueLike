@@ -9,6 +9,8 @@ import org.CobbleUtils.cobbleroguelike.RogueConfig;
 import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
 import org.CobbleUtils.cobbleroguelike.run.RunManager;
 import org.CobbleUtils.cobbleroguelike.run.RunState;
+import org.CobbleUtils.cobbleroguelike.run.Scaling;
+import org.CobbleUtils.cobbleroguelike.run.TrainerGenerator;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -130,10 +132,66 @@ public final class RogueMenus {
                         Text.literal("Rest stop").formatted(Formatting.GOLD), List.of(
                                 Text.literal("Fully heal your team."))),
                         p -> RunManager.get().chooseNode(p, index));
+                case TRAINER -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:iron_sword",
+                        Text.literal("Trainer battle").formatted(Formatting.RED), List.of(
+                                Text.literal("Fight a trainer around Lv. " + Scaling.trainerLevel(state) + "."),
+                                Text.literal("Your team gains EXP up to the level cap."))),
+                        p -> RunManager.get().chooseNode(p, index));
+                case GYM -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:gold_block",
+                        Text.literal("Gym battle").formatted(Formatting.GOLD, Formatting.BOLD), List.of(
+                                Text.literal("Badge " + (state.badges + 1) + " of " + RogueConfig.get().gymCount + "."),
+                                Text.literal("Leader's ace is Lv. " + Scaling.levelCap(state.badges) + "."),
+                                Text.literal("Losing ends the run!").formatted(Formatting.RED))),
+                        p -> RunManager.get().chooseNode(p, index));
+                case CHAMPION -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:dragon_head",
+                        Text.literal("The Champion").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), List.of(
+                                Text.literal("The final battle, Lv. " + Scaling.levelCap(state.badges) + "."),
+                                Text.literal("Win to complete your run!"))),
+                        p -> RunManager.get().chooseNode(p, index));
             }
         }
         addControls(menu, state);
         menu.open(player);
+    }
+
+    public static void battle(ServerPlayerEntity player, RunState state) {
+        Menu menu = new Menu(Text.literal(state.battleName));
+        String icon = switch (state.battleKind) {
+            case GYM -> "minecraft:gold_block";
+            case CHAMPION -> "minecraft:dragon_head";
+            default -> "minecraft:iron_sword";
+        };
+        int maxLevel = 0;
+        for (String member : state.battleTeam) {
+            maxLevel = Math.max(maxLevel, levelOf(member));
+        }
+        List<Text> lore = new ArrayList<>();
+        if (!state.battleType.isEmpty()) {
+            lore.add(Text.literal("Type: " + TrainerGenerator.capitalize(state.battleType)).formatted(Formatting.YELLOW));
+        }
+        lore.add(Text.literal("Team: " + state.battleTeam.size() + " Pokémon"));
+        lore.add(Text.literal("Strongest: Lv. " + maxLevel));
+        lore.add(Text.literal(""));
+        lore.add(Text.literal("Your damage carries over between battles.").formatted(Formatting.GRAY));
+        lore.add(Text.literal("Losing or forfeiting ends the run!").formatted(Formatting.RED));
+        menu.icon(13, Menu.stack(icon, Text.literal(state.battleName).formatted(Formatting.GOLD), lore));
+        menu.button(22, Menu.stack("minecraft:lime_concrete", Text.literal("Fight!").formatted(Formatting.GREEN, Formatting.BOLD), List.of()),
+                p -> RunManager.get().startBattle(p));
+        addControls(menu, state);
+        menu.open(player);
+    }
+
+    private static int levelOf(String properties) {
+        for (String part : properties.split(" ")) {
+            if (part.startsWith("level=")) {
+                try {
+                    return Integer.parseInt(part.substring("level=".length()));
+                } catch (NumberFormatException ignored) {
+                    return 0;
+                }
+            }
+        }
+        return 0;
     }
 
     public static void encounter(ServerPlayerEntity player, RunState state) {
@@ -169,7 +227,9 @@ public final class RogueMenus {
     }
 
     private static void addControls(Menu menu, RunState state) {
-        menu.icon(18, Menu.stack("minecraft:map", Text.literal("Floor " + state.floor).formatted(Formatting.WHITE), List.of()));
+        menu.icon(18, Menu.stack("minecraft:map", Text.literal("Floor " + state.floor).formatted(Formatting.WHITE), List.of(
+                Text.literal("Badges: " + state.badges + "/" + RogueConfig.get().gymCount),
+                Text.literal("Level cap: " + Scaling.levelCap(state.badges)))));
         menu.button(26, Menu.stack("minecraft:barrier", Text.literal("End run").formatted(Formatting.RED), List.of()),
                 p -> hub(p, true));
     }

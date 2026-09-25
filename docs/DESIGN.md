@@ -43,9 +43,10 @@ The whole run is played through server-side chest menus (`/rogue`). There's no d
       ┌───────────── each floor: choose 1 of 3 path cards ─────────────┐
       │  Route      : pick ONE of 3 wild Pokémon to join (or skip)      │
       │  Rest stop  : full heal                                         │
-      │  Trainer    : generated trainer battle        (next milestone)  │
+      │  Trainer    : generated AI trainer battle                       │
       │  Shop/Event : run currency, items             (later)           │
-      │  ► Gym every N floors: random type, scaled to cap (next)        │
+      │  ► Gym every 5th floor: random type, ace at the cap; badge      │
+      │  ► After 8 badges: the Champion. Beat them to win the run       │
       └─────────────────────────────────────────────────────────────────┘
 Whiteout / win / "End run" ─► rewards ─► real party restored
 ```
@@ -60,10 +61,20 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
 - **Your partner is one of your own Pokémon.** A PC-style picker lists your party and PC with level, nature, ability and shiny status. The run gets a **copy** with a new UUID and the rogue tag, reset to `starterLevel` (default 5, `resetStarterLevel` in the config). IVs, nature, ability and shininess carry over. The original stays in the journal or PC and never gains EXP, evolves or changes.
 - **Optional "Solo" modifier:** routes are disabled, so it's just you and your partner, and it pays bonus rewards.
 
+### Battles
+
+- Battles are **entity-less AI trainers**: a `TrainerBattleActor` using Cobblemon's `StrongBattleAI`. Trainers get skill 1–5 as badges rise, and gyms start one step higher.
+- The player fights with the run party directly, so **damage and fainting carry over** between battles. Rest stops heal, and so does beating a gym (`healAfterGym`).
+- Trainer Pokémon are battle clones and can't be caught. The **Bag Clause** is on, so real-inventory items can't be used.
+- Run battles start with `canPreempt = false`. The outside-battle guard and other mods' pre-battle hooks can't cancel them.
+- **Losing or forfeiting ends the run.** An interrupted battle (a disconnect or server stop) can be challenged again from `/rogue`, against the same trainer.
+- Teams are drawn from all implemented species within a base-stat-total window that grows with level. Legendaries, mythicals, Ultra Beasts and paradoxes are excluded. Gyms use a random type that isn't repeated within a run.
+
 ### Level cap and scaling
 
-- The run cap is `nextBoss.cap`, and route and trainer levels are derived from the floor.
-- Every rogue battle is started by the mod, so EXP and the cap stay under our control.
+- The run cap is `levelCaps[badges]`, default 15 / 21 / 27 / 33 / 40 / 47 / 54 / 61, with 70 for the Champion. Rogue Pokémon can't gain EXP past it.
+- Trainer and route levels ramp from the previous cap toward 85% of the next one across the 4 floors before each gym.
+- The gym team size is `gymTeamSizes[badges]`. Normal trainers bring 1–2 Pokémon early and more with each pair of badges.
 
 ### Difficulty tiers (Battle Tower-style)
 
@@ -141,7 +152,7 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
 ## 8. Milestones
 
 1. **Done (untested build):** journaled party swap and restore, crash recovery, guards, `/rogue` menus, partner picker (a copy of your own Pokémon), route (pick 1 of 3), rest, and the release screen.
-2. **Battles:** trainer nodes, gyms every N floors, run level cap, whiteout ends the run.
+2. **Done (untested build):** trainer nodes, gyms every 5 floors, the Champion, run level cap, losing ends the run.
 3. **Economy:** run money, a shop node, items as run state applied in battle.
 4. **Meta:** the quest board, Rogue Tokens and the vendor.
 5. **Modifiers:** Nuzlocke, Solo, Doubles, Rainbow, Gauntlet.

@@ -23,10 +23,23 @@ public final class RogueConfig {
     /** If false, the run copy keeps your Pokémon's real level. */
     public boolean resetStarterLevel = true;
     public int encounterOptions = 3;
-    public int encounterLevelPerFloor = 1;
-    public int maxEncounterLevel = 100;
-    /** Chance (0-1) that a path choice is a rest stop instead of a route. */
-    public double restChance = 0.35;
+
+    /** Every Nth floor is a gym (or the Champion once all badges are earned). */
+    public int gymEvery = 5;
+    /** Badges needed before the Champion appears. */
+    public int gymCount = 8;
+    /** Run level cap by badge count; the last entry is the Champion's level. */
+    public List<Integer> levelCaps = new ArrayList<>(List.of(15, 21, 27, 33, 40, 47, 54, 61, 70));
+    /** Gym team size by badge count; the last entry is the Champion's team size. */
+    public List<Integer> gymTeamSizes = new ArrayList<>(List.of(2, 3, 3, 4, 4, 5, 5, 6, 6));
+    /** Heal the party after beating a gym, like a Pokémon Center visit. */
+    public boolean healAfterGym = true;
+
+    /** Weights for the path cards on normal floors. */
+    public double trainerWeight = 0.45;
+    public double routeWeight = 0.35;
+    public double restWeight = 0.20;
+
     /** Ticks between scans that remove rogue Pokémon found outside an active run. */
     public int sweepIntervalTicks = 1200;
 
