@@ -18,9 +18,10 @@ public final class RogueConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static RogueConfig instance = new RogueConfig();
 
+    /** Level the run copy of your chosen partner is set to. Your real Pokémon is never changed. */
     public int starterLevel = 5;
-    public int starterOptions = 3;
-    public int freeRerolls = 1;
+    /** If false, the run copy keeps your Pokémon's real level. */
+    public boolean resetStarterLevel = true;
     public int encounterOptions = 3;
     public int encounterLevelPerFloor = 1;
     public int maxEncounterLevel = 100;
@@ -28,13 +29,6 @@ public final class RogueConfig {
     public double restChance = 0.35;
     /** Ticks between scans that remove rogue Pokémon found outside an active run. */
     public int sweepIntervalTicks = 1200;
-
-    public List<String> starterPool = new ArrayList<>(List.of(
-            "bulbasaur", "charmander", "squirtle", "chikorita", "cyndaquil", "totodile",
-            "treecko", "torchic", "mudkip", "turtwig", "chimchar", "piplup",
-            "snivy", "tepig", "oshawott", "chespin", "fennekin", "froakie",
-            "rowlet", "litten", "popplio", "grookey", "scorbunny", "sobble",
-            "sprigatito", "fuecoco", "quaxly", "pikachu", "eevee"));
 
     public List<String> encounterPool = new ArrayList<>(List.of(
             "caterpie", "weedle", "pidgey", "rattata", "spearow", "ekans", "sandshrew", "nidoranf",

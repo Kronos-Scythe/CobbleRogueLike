@@ -18,7 +18,8 @@ public final class MenuScreenHandler extends GenericContainerScreenHandler {
     private boolean clicked = false;
 
     public MenuScreenHandler(int syncId, PlayerInventory playerInventory, Menu menu) {
-        super(ScreenHandlerType.GENERIC_9X3, syncId, playerInventory, menu.inventory(), Menu.ROWS);
+        super(menu.rows() == 6 ? ScreenHandlerType.GENERIC_9X6 : ScreenHandlerType.GENERIC_9X3,
+                syncId, playerInventory, menu.inventory(), menu.rows());
         this.menu = menu;
     }
 

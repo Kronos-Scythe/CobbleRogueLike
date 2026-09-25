@@ -19,11 +19,11 @@ A roguelike adventure mode for Cobblemon. It is modelled mostly on **Pokémon Em
 
 | Source | Idea we take | How it maps |
 |---|---|---|
-| **Emerald Rogue** | One partner at start | The starter is picked from 3 rolled options drawn from your unlocked pool |
+| **Emerald Rogue** | One partner at start | Pick any Pokémon you own (party or PC). A copy joins the run at the starter level |
 | | Procedural routes, then a random gym leader of a random type | Pick-a-path menu cards, with a gym every N floors |
 | | Level cap equal to the next boss's cap | Run-local level cap, not the server's level-cap mod |
-| | Safari Zone of previously caught species | Hub "Safari" where caught species become future starter options (first evo stage) |
-| | Quests and rewards | Quest board in the hub that unlocks starters, modes and cosmetics |
+| | Safari Zone of previously caught species | Your own collection is the pool: anything you have caught can be a partner |
+| | Quests and rewards | Quest board in the hub that unlocks modes, modifiers and cosmetics |
 | | Difficulty settings, doubles toggle, Gauntlet and Rainbow modes | Run modifiers chosen at the start |
 | **Battle Tower** | Tiered difficulty with gimmicks unlocked by tier | Gym 1–2 has no gimmicks, then Tera, then Dynamax/Mega, then everything |
 | | Battle Points plus a shop | Run currency spent in shop nodes, and a meta currency paid out at the end of the run |
@@ -38,7 +38,7 @@ A roguelike adventure mode for Cobblemon. It is modelled mostly on **Pokémon Em
 The whole run is played through server-side chest menus (`/rogue`). There's no dimension, map or arenas, and the player stays wherever they are.
 
 ```
-/rogue ──► Start ──► pick 1 of 3 starters (1 free reroll)
+/rogue ──► Start ──► pick your partner from your party/PC
                           │
       ┌───────────── each floor: choose 1 of 3 path cards ─────────────┐
       │  Route      : pick ONE of 3 wild Pokémon to join (or skip)      │
@@ -57,7 +57,7 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
 ### Starting with a single Pokémon
 
 - Early floors are tuned for one partner: the first gym is at level 12–15, and early trainers bring at most 2 Pokémon.
-- You get one free starter reroll (configurable), and quests can unlock more later.
+- **Your partner is one of your own Pokémon.** A PC-style picker lists your party and PC with level, nature, ability and shiny status. The run gets a **copy** with a new UUID and the rogue tag, reset to `starterLevel` (default 5, `resetStarterLevel` in the config). IVs, nature, ability and shininess carry over. The original stays in the journal or PC and never gains EXP, evolves or changes.
 - **Optional "Solo" modifier:** routes are disabled, so it's just you and your partner, and it pays bonus rewards.
 
 ### Level cap and scaling
@@ -113,8 +113,7 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
 
 **Kept inside the mode (meta progression):**
 
-- The Safari/starter pool unlocks (first evolution stage of every species you catch)
-- Quest-board unlocks: extra rerolls, a bigger starting ball count, modes (Gauntlet, Rainbow, Solo)
+- Quest-board unlocks: modes (Gauntlet, Rainbow, Solo) and modifiers
 - Run history and hall of fame
 
 ---
@@ -135,15 +134,15 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
 - **Target:** Cobblemon 1.6.x on MC 1.21.1, Fabric (yarn mappings). All Cobblemon API calls live in `compat/CobblemonBridge` and `compat/CobblemonGuards`, so an API change only needs fixing there.
 - **Menus:** vanilla `GenericContainerScreenHandler` subclasses (`ui/Menu`, `ui/MenuScreenHandler`). No client code is needed, and clicks never move items.
 - **Battles (next):** build trainer actors programmatically and start them through the battle registry. Mark them as sanctioned so the battle guard lets them through.
-- **Data-driven:** starter and encounter pools live in `config/cobbleroguelike.json` for now, and move to datapack JSON with trainers, gyms and shops.
+- **Data-driven:** encounter pools live in `config/cobbleroguelike.json` for now, and move to datapack JSON with trainers, gyms and shops.
 
 ---
 
 ## 8. Milestones
 
-1. **Done (untested build):** journaled party swap and restore, crash recovery, guards, `/rogue` menus, starter pick with reroll, route (pick 1 of 3), rest, and the release screen.
+1. **Done (untested build):** journaled party swap and restore, crash recovery, guards, `/rogue` menus, partner picker (a copy of your own Pokémon), route (pick 1 of 3), rest, and the release screen.
 2. **Battles:** trainer nodes, gyms every N floors, run level cap, whiteout ends the run.
 3. **Economy:** run money, a shop node, items as run state applied in battle.
-4. **Meta:** starter unlocks from caught species, the quest board, Rogue Tokens and the vendor.
+4. **Meta:** the quest board, Rogue Tokens and the vendor.
 5. **Modifiers:** Nuzlocke, Solo, Doubles, Rainbow, Gauntlet.
 6. **Co-op:** invites, multi battles.

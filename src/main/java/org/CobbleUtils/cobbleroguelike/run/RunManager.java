@@ -116,7 +116,20 @@ public final class RunManager {
 
     // ---------------------------------------------------------------- start / end
 
+    /** Opens the partner picker. Nothing is swapped until a Pokémon is chosen. */
     public void start(ServerPlayerEntity player) {
+        if (active.containsKey(player.getUuid())) {
+            openCurrent(player);
+            return;
+        }
+        RogueMenus.partnerPicker(player, 0);
+    }
+
+    /**
+     * Starts a run with a copy of one of the player's own Pokémon (party or PC) as the only
+     * partner. The original stays in the journal or PC and never gains EXP or changes.
+     */
+    public void beginRun(ServerPlayerEntity player, UUID partnerId) {
         UUID id = player.getUuid();
         if (active.containsKey(id)) {
             openCurrent(player);
@@ -130,8 +143,18 @@ public final class RunManager {
             message(player, "Your previous run hasn't been cleaned up yet. Rejoin or ask an admin.", Formatting.RED);
             return;
         }
+        Pokemon original = CobblemonBridge.findOwned(player, partnerId);
+        if (original == null || CobblemonBridge.isRogue(original)) {
+            message(player, "That Pokémon isn't available anymore.", Formatting.RED);
+            RogueMenus.partnerPicker(player, 0);
+            return;
+        }
 
         DynamicRegistryManager registries = player.getRegistryManager();
+        RogueConfig config = RogueConfig.get();
+        Pokemon partner = CobblemonBridge.createRogueCopy(original, registries,
+                config.resetStarterLevel ? config.starterLevel : 0);
+
         List<Pokemon> realParty = CobblemonBridge.partyMembers(player);
         NbtList saved = new NbtList();
         for (Pokemon pokemon : realParty) {
@@ -155,9 +178,9 @@ public final class RunManager {
                 CobblemonBridge.recall(pokemon);
                 CobblemonBridge.party(player).remove(pokemon);
             }
-            RogueConfig config = RogueConfig.get();
-            RunState state = new RunState(id, new Random().nextLong(), config.freeRerolls);
-            state.starterOptions = rollStarters(state);
+            CobblemonBridge.party(player).add(partner);
+            RunState state = new RunState(id, new Random().nextLong());
+            advanceFloor(state);
             storage.writeRun(state);
             active.put(id, state);
         } catch (IOException | RuntimeException e) {
@@ -171,7 +194,8 @@ public final class RunManager {
             return;
         }
 
-        message(player, "Your party is safely stored. Choose your partner!", Formatting.GREEN);
+        message(player, "Your party is safely stored. Good luck, you and your "
+                + partner.getSpecies().getName() + "!", Formatting.GREEN);
         openCurrent(player);
     }
 
@@ -272,36 +296,10 @@ public final class RunManager {
             return;
         }
         switch (state.phase) {
-            case STARTER -> RogueMenus.starter(player, state);
             case CHOOSE_NODE -> RogueMenus.path(player, state);
             case ENCOUNTER -> RogueMenus.encounter(player, state);
             case RELEASE -> RogueMenus.release(player, state);
         }
-    }
-
-    public void chooseStarter(ServerPlayerEntity player, int index) {
-        RunState state = requirePhase(player, Phase.STARTER);
-        if (state == null || index < 0 || index >= state.starterOptions.size()) {
-            return;
-        }
-        String species = state.starterOptions.get(index);
-        CobblemonBridge.party(player).add(CobblemonBridge.createRogue(species + " level=" + RogueConfig.get().starterLevel));
-        state.starterOptions.clear();
-        advanceFloor(state);
-        save(player, state);
-        openCurrent(player);
-    }
-
-    public void rerollStarters(ServerPlayerEntity player) {
-        RunState state = requirePhase(player, Phase.STARTER);
-        if (state == null || state.rerollsLeft <= 0) {
-            return;
-        }
-        state.rerollsLeft--;
-        state.rerollsUsed++;
-        state.starterOptions = rollStarters(state);
-        save(player, state);
-        openCurrent(player);
     }
 
     public void chooseNode(ServerPlayerEntity player, int index) {
@@ -395,12 +393,7 @@ public final class RunManager {
 
     /** Seeded per floor, so relogging or reopening a menu can't reroll choices. */
     private static Random rng(RunState state, int salt) {
-        return new Random(state.seed * 31L + state.floor * 1_000_003L + state.rerollsUsed * 7919L + salt);
-    }
-
-    private static List<String> rollStarters(RunState state) {
-        RogueConfig config = RogueConfig.get();
-        return pickDistinct(config.starterPool, config.starterOptions, rng(state, 1));
+        return new Random(state.seed * 31L + state.floor * 1_000_003L + salt);
     }
 
     private static List<String> rollEncounters(RunState state) {

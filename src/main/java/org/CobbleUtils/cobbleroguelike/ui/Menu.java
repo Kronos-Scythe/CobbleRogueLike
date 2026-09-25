@@ -24,14 +24,20 @@ import java.util.function.Consumer;
  */
 public final class Menu {
 
-    public static final int ROWS = 3;
-
     private final Text title;
-    private final SimpleInventory inventory = new SimpleInventory(ROWS * 9);
+    private final int rows;
+    private final SimpleInventory inventory;
     private final Map<Integer, Consumer<ServerPlayerEntity>> actions = new HashMap<>();
 
     public Menu(Text title) {
+        this(title, 3);
+    }
+
+    /** {@code rows} is 3 or 6. */
+    public Menu(Text title, int rows) {
         this.title = title;
+        this.rows = rows == 6 ? 6 : 3;
+        this.inventory = new SimpleInventory(this.rows * 9);
     }
 
     public Menu button(int slot, ItemStack icon, Consumer<ServerPlayerEntity> action) {
@@ -44,6 +50,10 @@ public final class Menu {
 
     public Menu icon(int slot, ItemStack icon) {
         return button(slot, icon, null);
+    }
+
+    int rows() {
+        return rows;
     }
 
     SimpleInventory inventory() {
@@ -72,7 +82,12 @@ public final class Menu {
         if (item == Items.AIR) {
             item = Items.PAPER;
         }
-        ItemStack stack = new ItemStack(item);
+        return stack(new ItemStack(item), name, lore);
+    }
+
+    /** Names and describes an existing stack, such as a Pokémon model icon. */
+    public static ItemStack stack(ItemStack base, Text name, List<Text> lore) {
+        ItemStack stack = base.copy();
         stack.set(DataComponentTypes.CUSTOM_NAME, name.copy().styled(s -> s.withItalic(false)));
         if (!lore.isEmpty()) {
             stack.set(DataComponentTypes.LORE, new LoreComponent(lore.stream()
