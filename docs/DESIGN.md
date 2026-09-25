@@ -9,8 +9,9 @@ A roguelike adventure mode for Cobblemon. It is modelled mostly on **Pokémon Em
 1. **You start with one Pokémon.** Every run begins with a single partner, and the team is built during the run.
 2. **Isolated runs.** The rogue party, bag, levels and evolutions never touch the main-world party, PC or progression.
 3. **Branching adventure path.** Routes lead to a gym. You pick your path between gyms, and gym types, trainers and encounters are procedurally chosen.
-4. **Meta progression lives in the mode.** Species you catch in runs unlock things for future runs, the way Emerald Rogue's Safari Zone does. They are not handed to the main world.
-5. **Solo first, co-op second.** Co-op multi battles come in v2.
+4. **Menu-driven.** Like Battle Tower, the run is a series of menus and battles, not a world to explore.
+5. **Meta progression lives in the mode.** Species you catch in runs unlock things for future runs, the way Emerald Rogue's Safari Zone does. They are not handed to the main world.
+6. **Solo first, co-op second.** Co-op multi battles come in v2.
 
 ---
 
@@ -19,7 +20,7 @@ A roguelike adventure mode for Cobblemon. It is modelled mostly on **Pokémon Em
 | Source | Idea we take | How it maps |
 |---|---|---|
 | **Emerald Rogue** | One partner at start | The starter is picked from 3 rolled options drawn from your unlocked pool |
-| | Procedural routes, then a random gym leader of a random type | Adventure map made of nodes, with a boss node every N nodes |
+| | Procedural routes, then a random gym leader of a random type | Pick-a-path menu cards, with a gym every N floors |
 | | Level cap equal to the next boss's cap | Run-local level cap, not the server's level-cap mod |
 | | Safari Zone of previously caught species | Hub "Safari" where caught species become future starter options (first evo stage) |
 | | Quests and rewards | Quest board in the hub that unlocks starters, modes and cosmetics |
@@ -32,75 +33,69 @@ A roguelike adventure mode for Cobblemon. It is modelled mostly on **Pokémon Em
 
 ---
 
-## 3. The run loop
+## 3. The run loop (menu-driven, Battle Tower-style)
+
+The whole run is played through server-side chest menus (`/rogue`). There's no dimension, map or arenas, and the player stays wherever they are.
 
 ```
-Hub ──► choose modifiers ──► pick 1 of 3 starters ──► Adventure map
-                                                          │
-      ┌───────────── repeat per "chapter" (8 gyms → E4 → Champion) ─────────────┐
-      │  choose next node (2–3 branches)                                         │
-      │    Route      : encounter arena, catch ONE Pokémon (limited balls)       │
-      │    Trainer    : generated trainer battle, money + item                   │
-      │    Rest stop  : heal, or tutor/move-relearner                            │
-      │    Shop       : spend run money                                          │
-      │    Event      : berry tree, item cache, legendary encounter, wonder trade│
-      │  ► Gym node   : random type, team scaled to cap, badge = cap increase    │
-      └──────────────────────────────────────────────────────────────────────────┘
-Whiteout (or win) ─► results screen ─► meta rewards ─► restore main save ─► Hub
+/rogue ──► Start ──► pick 1 of 3 starters (1 free reroll)
+                          │
+      ┌───────────── each floor: choose 1 of 3 path cards ─────────────┐
+      │  Route      : pick ONE of 3 wild Pokémon to join (or skip)      │
+      │  Rest stop  : full heal                                         │
+      │  Trainer    : generated trainer battle        (next milestone)  │
+      │  Shop/Event : run currency, items             (later)           │
+      │  ► Gym every N floors: random type, scaled to cap (next)        │
+      └─────────────────────────────────────────────────────────────────┘
+Whiteout / win / "End run" ─► rewards ─► real party restored
 ```
+
+- Choices are **seeded per floor**, so reopening the menu or relogging can't reroll them.
+- A full party (6) opens a "release one?" screen.
+- Runs **persist across relogs and restarts**: resume with `/rogue`.
 
 ### Starting with a single Pokémon
 
-This is the defining constraint, so the early game has to be tuned around it:
-
-- The **first route is guaranteed**: a route node with 3 wild options, at least one of which is super-effective against the first gym's type.
-- **First gym at level 12–15.** Trainers before it field at most 2 Pokémon.
-- **One free starter reroll** per run, with more unlocked through quests.
-- **Optional hardcore modifier:** "Solo" (you can never catch, so it's just you and your partner), which pays out bonus meta currency.
-- **Weighted starter pool:** 3 options from different rarity or BST bands, so there's always a safe pick and a greedy pick.
-
-### Catching
-
-Route nodes teleport you into a small biome arena where a few wild Pokémon are spawned by the mod, not by natural spawning. You catch physically with a limited number of run Poké Balls, which keeps the Cobblemon feel. Once you catch one, the rest despawn, so it's **one catch per route**, like Emerald Rogue. Nuzlocke rules are an optional modifier.
+- Early floors are tuned for one partner: the first gym is at level 12–15, and early trainers bring at most 2 Pokémon.
+- You get one free starter reroll (configurable), and quests can unlock more later.
+- **Optional "Solo" modifier:** routes are disabled, so it's just you and your partner, and it pays bonus rewards.
 
 ### Level cap and scaling
 
-- The run cap is `nextBoss.cap`, for example 15 → 20 → 25 → … → 70 for the Champion, and is configurable.
-- EXP is blocked, or carried over to the next level cap (configurable), once a Pokémon reaches the cap. Rare Candies are clamped too.
-- Trainer and wild levels are derived from the cap and the node depth.
+- The run cap is `nextBoss.cap`, and route and trainer levels are derived from the floor.
+- Every rogue battle is started by the mod, so EXP and the cap stay under our control.
 
-### Difficulty tiers (Battle Tower–style)
+### Difficulty tiers (Battle Tower-style)
 
-| Chapter | Trainer AI | Gimmicks | Team size |
+| Floors | Trainer AI | Gimmicks | Team size |
 |---|---|---|---|
 | Gyms 1–2 | basic | none | 2–4 |
 | Gyms 3–4 | smarter | Tera on bosses | 4–5 |
 | Gyms 5–6 | smart | Tera, Mega | 5–6 |
-| Gyms 7–8, E4, Champ | best | all gimmicks, legends on Champ | 6 |
-
-Your PokeRogue ability and egg-move data feeds the trainer and wild generators here. Because rogue Pokémon are throwaway, they can use it without affecting main-game balance.
+| Gyms 7–8, E4, Champ | best | all, legends on Champ | 6 |
 
 ---
 
-## 4. Isolation (the hard part)
+## 4. Isolation: party-only swap
 
-### Recommended approach: rogue dimension plus journaled full swap
+Because the run is played in menus, **only the party is swapped**. The run's bag stays virtual inside the run state, and the player's inventory, position and PC are never touched.
 
-1. The player enters through a hub NPC or portal.
-2. **The swap is written to disk first.** Main party, PC lock flag, inventory, XP, position and dimension go into a `RogueSaveJournal` on the player's persistent data (or a per-player file) *before* anything changes.
-3. The main party is moved into a hidden custom store. The player gets an empty party and a run inventory, then is teleported to `cobbleroguelike:rogue`.
-4. On exit (win, whiteout or `/rogue quit`), the reverse happens, and the journal is cleared **last**.
-5. **On login and on server start**, if a journal exists and the player isn't in an active run, restore from it. This is what makes crashes and disconnects mid-swap safe.
+1. **The journal is written first.** The real party goes to `<world>/cobbleroguelike/journals/<uuid>.dat` (temp file, then atomic rename) before anything changes.
+2. The real party is removed. Every Pokémon created for the run carries a persistent `cobbleroguelike_rogue` tag.
+3. `runs/<uuid>.dat` is written once the swap is complete, and again after every choice.
+4. **Ending the run:** delete the rogue-tagged Pokémon, move any *untagged* strangers to the PC (never delete them), then add the journal Pokémon back, skipping any UUID already in the party or PC. The journal is deleted **last**. Because of this, the restore is safe to run twice and never duplicates.
+5. **Recovery on join:**
+   - A journal with no run file means the swap was interrupted, so the party is restored.
+   - A run file whose party contains an untagged Pokémon is corrupt, so the party is restored.
+   - A run file with no journal is discarded.
 
-### Rules inside the rogue dimension (enforced server-side)
+### Guards while a run is active
 
-- PC access, trading, dropping items, containers, ender chests, `/give`-style item transfer, Pokémon release to the world, and daycare/breeding are blocked.
-- Battles started there are tagged `rogue`. Level-cap mods, RCT progression hooks and advancement/Pokédex hooks either ignore them or get an explicit allowlist. Pokédex "seen/caught" is the one thing we let leak, and it's configurable.
-- There's one active run per player, and a co-op run belongs to its party leader.
-
-### Alternative considered: virtual team, no swap
-
-Cobblemon can start battles from manually built actors, so in principle the rogue team could live only in a custom store and never touch the real party. The catch is that the party HUD, send-out keybind and summary screen all read the real party, so we'd need client-side replacements. The swap approach reuses all of Cobblemon's existing UI, so it wins for v1.
+- **Battles:** Cobblemon battles the mod didn't start are cancelled. This stops free EXP and catching.
+- **Catching:** thrown Poké Balls are cancelled, so wild Pokémon can't join and rogue Pokémon can't overflow into the PC.
+- **Held items:** changes are cancelled, so items can't move between the rogue party and the real inventory.
+- **PC:** the block is locked, and `/pc` and `/trade` are blocked for non-ops. The blocked commands are configurable.
+- **Sweep:** every 60 s, any rogue-tagged Pokémon found in a PC (or in a party with no run) is deleted. This catches leaks such as trades done through the interaction wheel.
 
 ---
 
@@ -137,20 +132,18 @@ Cobblemon can start battles from manually built actors, so in principle the rogu
 
 ## 7. Technical notes
 
-- **Target:** Cobblemon 1.6.x / 1.7.x on MC 1.21.1 (Fabric + NeoForge via Architectury, matching Cobblemon). Check exact API names against the target Cobblemon version before building on them.
-- **Battles:** build actors and sides programmatically and start them through the battle registry with a singles or doubles format. Trainer teams come from our generator as `PokemonProperties`.
-- **Trainers:** our own lightweight NPC entity, or Cobblemon NPCs. Skins come from a config folder, the same pattern Battle Tower uses.
-- **Arenas:** prebuilt structure templates (one per biome, plus gym and E4 rooms), pasted into the rogue dimension on a per-run grid so runs never overlap.
-- **Wild spawning:** natural Cobblemon spawning is disabled in the rogue dimension, and encounter Pokémon are spawned explicitly.
-- **Data-driven:** encounter pools, gym type pools, trainer archetypes, shop tables and reward tables are all datapack JSON, so modpacks can retune them.
+- **Target:** Cobblemon 1.6.x on MC 1.21.1, Fabric (yarn mappings). All Cobblemon API calls live in `compat/CobblemonBridge` and `compat/CobblemonGuards`, so an API change only needs fixing there.
+- **Menus:** vanilla `GenericContainerScreenHandler` subclasses (`ui/Menu`, `ui/MenuScreenHandler`). No client code is needed, and clicks never move items.
+- **Battles (next):** build trainer actors programmatically and start them through the battle registry. Mark them as sanctioned so the battle guard lets them through.
+- **Data-driven:** starter and encounter pools live in `config/cobbleroguelike.json` for now, and move to datapack JSON with trainers, gyms and shops.
 
 ---
 
 ## 8. Milestones
 
-1. **Skeleton.** Rogue dimension, the journaled swap and restore, block rules, and `/rogue start|quit`.
-2. **Minimal loop.** Pick 1 of 3 starters, then a linear list of route and trainer nodes, 1 gym, and a results screen.
-3. **Adventure map.** Branching nodes, shop and rest nodes, the full 8 gyms, E4 and Champion, run level cap, and difficulty tiers.
-4. **Meta.** Safari/starter unlocks, the quest board, Rogue Tokens and the main-world vendor.
-5. **Modifiers.** Nuzlocke, Solo, Doubles, Rainbow and Gauntlet.
-6. **Co-op.** Invites, multi battles, shared map voting.
+1. **Done (untested build):** journaled party swap and restore, crash recovery, guards, `/rogue` menus, starter pick with reroll, route (pick 1 of 3), rest, and the release screen.
+2. **Battles:** trainer nodes, gyms every N floors, run level cap, whiteout ends the run.
+3. **Economy:** run money, a shop node, items as run state applied in battle.
+4. **Meta:** starter unlocks from caught species, the quest board, Rogue Tokens and the vendor.
+5. **Modifiers:** Nuzlocke, Solo, Doubles, Rainbow, Gauntlet.
+6. **Co-op:** invites, multi battles.

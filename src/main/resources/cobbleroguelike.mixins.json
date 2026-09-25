@@ -4,6 +4,7 @@
   "package": "org.CobbleUtils.cobbleroguelike.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "CommandManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

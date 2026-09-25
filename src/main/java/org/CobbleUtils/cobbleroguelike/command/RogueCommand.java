@@ -1,0 +1,52 @@
+package org.CobbleUtils.cobbleroguelike.command;
+
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.command.argument.EntityArgumentType;
+import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Text;
+import org.CobbleUtils.cobbleroguelike.RogueConfig;
+import org.CobbleUtils.cobbleroguelike.run.RunManager;
+
+import static net.minecraft.server.command.CommandManager.argument;
+import static net.minecraft.server.command.CommandManager.literal;
+
+/**
+ * {@code /rogue} opens the menu. {@code /rogue end} ends the run.
+ * Admin: {@code /rogue admin end <player>}, {@code /rogue admin reload}.
+ */
+public final class RogueCommand {
+
+    private RogueCommand() {
+    }
+
+    public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
+        dispatcher.register(literal("rogue")
+                .executes(ctx -> {
+                    RunManager.get().openCurrent(ctx.getSource().getPlayerOrThrow());
+                    return 1;
+                })
+                .then(literal("end").executes(ctx -> {
+                    ServerPlayerEntity player = ctx.getSource().getPlayerOrThrow();
+                    if (!RunManager.isInRun(player)) {
+                        ctx.getSource().sendError(Text.literal("You don't have a run in progress."));
+                        return 0;
+                    }
+                    RunManager.get().end(player, "You ended your run.");
+                    return 1;
+                }))
+                .then(literal("admin")
+                        .requires(source -> source.hasPermissionLevel(2))
+                        .then(literal("end").then(argument("player", EntityArgumentType.player()).executes(ctx -> {
+                            ServerPlayerEntity target = EntityArgumentType.getPlayer(ctx, "player");
+                            RunManager.get().end(target, "An admin ended your run.");
+                            ctx.getSource().sendFeedback(() -> Text.literal("Ended rogue run for " + target.getName().getString()), true);
+                            return 1;
+                        })))
+                        .then(literal("reload").executes(ctx -> {
+                            RogueConfig.load();
+                            ctx.getSource().sendFeedback(() -> Text.literal("Reloaded CobbleRogueLike config"), true);
+                            return 1;
+                        }))));
+    }
+}
