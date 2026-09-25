@@ -6,7 +6,6 @@ import net.minecraft.entity.Entity;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Formatting;
 import org.CobbleUtils.cobbleroguelike.run.RunManager;
-import kotlin.Unit;
 
 /** Cobblemon event hooks that stop rogue Pokémon from interacting with the main game. */
 public final class CobblemonGuards {
@@ -25,7 +24,6 @@ public final class CobblemonGuards {
                     break;
                 }
             }
-            return Unit.INSTANCE;
         });
 
         // Catching would add main-world Pokémon to the run, or overflow rogue ones into the PC.
@@ -35,7 +33,6 @@ public final class CobblemonGuards {
                 event.cancel();
                 RunManager.message(player, "You can't catch Pokémon while a run is active.", Formatting.RED);
             }
-            return Unit.INSTANCE;
         });
 
         // Held-item swaps would move items between the rogue party and the real inventory.
@@ -45,7 +42,6 @@ public final class CobblemonGuards {
                 event.cancel();
                 RunManager.message(player, "Held items can't be changed during a run.", Formatting.RED);
             }
-            return Unit.INSTANCE;
         });
     }
 }

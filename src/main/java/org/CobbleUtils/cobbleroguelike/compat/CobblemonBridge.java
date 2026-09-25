@@ -85,10 +85,7 @@ public final class CobblemonBridge {
 
     /** Creates a rogue-tagged Pokémon from a property string such as {@code "mudkip level=5"}. */
     public static Pokemon createRogue(String properties) {
-        PokemonProperties parsed = PokemonProperties.Companion.parse(properties, " ", "=");
-        Pokemon pokemon = new Pokemon();
-        parsed.apply(pokemon);
-        pokemon.initialize();
+        Pokemon pokemon = PokemonProperties.Companion.parse(properties).create();
         markRogue(pokemon);
         return pokemon;
     }

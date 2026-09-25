@@ -32,6 +32,6 @@
     "fabric-api": "*",
     "minecraft": "${minecraft_version}",
     "fabric-language-kotlin": "*",
-    "cobblemon": ">=1.6.0"
+    "cobblemon": ">=1.8.0"
   }
 }
