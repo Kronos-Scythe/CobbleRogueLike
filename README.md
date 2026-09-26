@@ -29,7 +29,8 @@ The Gradle daemon runs on Java 25 (see `gradle/gradle-daemon-jvm.properties`). T
 
 1. **`/rogue` → Start a run.** Toggle optional **modifiers**, then pick a partner from your party or PC. A copy joins the run at level 5, and your real party is saved safely until the run ends.
 2. **Each floor, choose 1 of 3 path cards:**
-   - **Route:** each route card is its own biome (Desert, Tundra, Volcano…, shown by its block). Pick one of 3 wild Pokémon from it.
+   - **Route:** each route card is its own biome (Desert, Tundra, Volcano…, shown by its block). Pick one of 3 wild Pokémon from it. Later in the run they come evolved for their level and rare spawns show up more often.
+   - **Rare encounter** (from the 1st badge, ~8% of floors): pick one of 3 strong competitive Pokémon (Garchomp, Gholdengo, Dragapult… from the 4th badge).
    - **Trainer:** fight an AI trainer (NPC) and earn coins.
    - **Rest stop:** full heal.
    - **Legendary:** fight a legendary and it joins you if you win (after badges 3 and 6, rarely otherwise; co-op after badges 4 and 7).
@@ -38,7 +39,7 @@ The Gradle daemon runs on Java 25 (see `gradle/gradle-daemon-jvm.properties`). T
 3. **Every 5th floor is a gym.** It has a random type, a double battle, a competitive team and a badge. Your run level cap rises with each badge.
    Before any boss (gym, Elite Four, Champion) you get free **Boss prep**, once each per boss and per player:
    - **Train to level cap:** one click, no grinding; moves and evolutions happen as usual.
-   - **Full heal.**
+   - **Full heal:** free before the first gym, then it costs coins (2000 + 750 per badge).
    - **Draft a counter** (only with the Counter Draft modifier): pick 1 of 3 Pokémon at the cap that are strong against the boss's type.
 4. **After 8 badges**, 4 Elite Four battles, then **the Champion**. Beat them to win.
 5. **Losing or forfeiting ends the run.** Either way you earn **Rogue Tokens** to spend in the Rogue Shop.
@@ -118,8 +119,8 @@ Run modifiers (Nuzlocke, Hard…) stay optional. To make the game easier, lower 
 - **Balance:** `expMultiplier` (2× EXP for run Pokémon), `catchUpExp`, `rampUntilBadge`, `startRouteFloors`, `prepTrainToCap`, `prepDraft`, `prepHeal`, `prepDraftOptions`
 - **Difficulty:** `setTierBonus`, `maxTrainerAi`, `trainerArchetypesFromBadge`, `healAfterGym`, `healAfterElite`
 - **Battles:** `bossArchetypes`, `archetypeFromBadge`, `bossTeraFromBadge`, `bossMegaFromBadge`, `doubleBattles` (`bosses` / `all` / `none`), `doubleTrainerChance`, `bossGimmicks`
-- **Encounters:** `biomes` (Minecraft/Cobblemon biome ids and `#tags`, plus theme types), spawn bucket weights, `shinyChance`, `hiddenAbilityChance`, and the legendary settings
-- **Economy:** `startingMoney`, trainer rewards, the `shop` catalog, `moveTutorPrice`
+- **Encounters:** `biomes` (Minecraft/Cobblemon biome ids and `#tags`, plus theme types), spawn bucket weights, `shinyChance`, `hiddenAbilityChance`, `evolveEncounters`, `encounterRarityPerBadge`, the Rare encounter (`metaEncounterChance`, `metaPoolStrong`, `metaPoolTop`) and the legendary settings
+- **Economy:** `startingMoney`, trainer rewards, the `shop` catalog (held items priced by how strong they are competitively), `megaStonePrices`, `prepHealPrice`, `moveTutorPrice`
 - **Rewards:** `tokensPerFloor`, `tokensPerBadge`, `championTokenBonus`, the `tokenShop` catalog, modifier bonuses
 - **UI:** `clientScreen` (use the run screen for players who have the mod), each biome's `block`
 - **Blocked commands** during runs: `blockedCommands`

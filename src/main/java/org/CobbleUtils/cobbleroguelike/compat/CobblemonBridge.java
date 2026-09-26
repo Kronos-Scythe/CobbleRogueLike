@@ -3,6 +3,8 @@ package org.CobbleUtils.cobbleroguelike.compat;
 import com.cobblemon.mod.common.Cobblemon;
 import com.cobblemon.mod.common.api.pokemon.PokemonProperties;
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
+import com.cobblemon.mod.common.api.pokemon.evolution.Evolution;
+import com.cobblemon.mod.common.api.pokemon.requirement.Requirement;
 import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore;
 import com.cobblemon.mod.common.api.storage.pc.PCStore;
 import com.cobblemon.mod.common.api.types.ElementalType;
@@ -12,6 +14,9 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.item.PokemonItem;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.cobblemon.mod.common.pokemon.Species;
+import com.cobblemon.mod.common.pokemon.evolution.variants.ItemInteractionEvolution;
+import com.cobblemon.mod.common.pokemon.evolution.variants.TradeEvolution;
+import com.cobblemon.mod.common.pokemon.requirements.LevelRequirement;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.DynamicRegistryManager;
@@ -287,6 +292,53 @@ public final class CobblemonBridge {
 
     public static void healParty(ServerPlayerEntity player) {
         party(player).heal();
+    }
+
+    /**
+     * Evolves a property string (species first) to the stage that fits {@code level}: level-up
+     * evolutions at their level, stone/trade ones from {@code itemLevel}, anything else (friendship,
+     * time of day...) from {@code otherLevel}. Branches (Eevee...) are picked at random.
+     */
+    public static String evolvedForLevel(String properties, int level, int itemLevel, int otherLevel, java.util.Random random) {
+        String current = properties;
+        for (int step = 0; step < 3; step++) {
+            Pokemon pokemon;
+            try {
+                pokemon = create(current);
+            } catch (RuntimeException e) {
+                return current;
+            }
+            List<String> options = new ArrayList<>();
+            for (Evolution evolution : pokemon.getForm().getEvolutions()) {
+                String species = evolution.getResult().getSpecies();
+                if (species == null || species.isBlank() || speciesById(species) == null) {
+                    continue;
+                }
+                if (level >= requiredLevel(evolution, itemLevel, otherLevel) && !options.contains(species)) {
+                    options.add(species);
+                }
+            }
+            if (options.isEmpty()) {
+                return current;
+            }
+            options.sort(String::compareTo);
+            String next = options.get(random.nextInt(options.size()));
+            int space = current.indexOf(' ');
+            current = space < 0 ? next : next + current.substring(space);
+        }
+        return current;
+    }
+
+    private static int requiredLevel(Evolution evolution, int itemLevel, int otherLevel) {
+        for (Requirement requirement : evolution.getRequirements()) {
+            if (requirement instanceof LevelRequirement levelRequirement && levelRequirement.getMinLevel() > 1) {
+                return levelRequirement.getMinLevel();
+            }
+        }
+        if (evolution instanceof ItemInteractionEvolution || evolution instanceof TradeEvolution) {
+            return itemLevel;
+        }
+        return otherLevel;
     }
 
     public static int level(Pokemon pokemon) {

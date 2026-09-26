@@ -20,7 +20,8 @@ public final class RunState {
 
     public enum Phase { CHOOSE_NODE, ENCOUNTER, RELEASE, BATTLE }
 
-    public enum NodeType { ROUTE, REST, TRAINER, GYM, ELITE, CHAMPION, LEGENDARY }
+    /** META is the Rare encounter: a route with strong competitive Pokémon. */
+    public enum NodeType { ROUTE, REST, TRAINER, GYM, ELITE, CHAMPION, LEGENDARY, META }
 
     /** The run's owner (the host in co-op). The run file is stored under this id. */
     public final UUID playerId;

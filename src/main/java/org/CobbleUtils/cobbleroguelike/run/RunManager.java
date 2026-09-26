@@ -1270,11 +1270,27 @@ public final class RunManager {
         if (state == null) {
             return;
         }
+        int price = prepHealPrice(state);
+        if (state.money < price) {
+            message(player, "A full heal costs " + price + " coins; you have " + state.money + ".", Formatting.RED);
+            openCurrent(player);
+            return;
+        }
+        state.money -= price;
         CobblemonBridge.healParty(player);
         state.prepUsed.add(player.getUuid() + ":heal");
-        message(player, "Your team is fully healed and ready.", Formatting.GREEN);
+        message(player, price > 0 ? "Your team is fully healed (-" + price + " coins)." : "Your team is fully healed and ready.", Formatting.GREEN);
         save(player, state);
         openCurrent(player);
+    }
+
+    /** Boss prep heal: free before the first gym, then prepHealPrice + prepHealPricePerBadge per badge. */
+    public static int prepHealPrice(RunState state) {
+        RogueConfig config = RogueConfig.get();
+        if (state.badges == 0 && state.battleKind == NodeType.GYM) {
+            return 0;
+        }
+        return Math.max(0, config.prepHealPrice + config.prepHealPricePerBadge * state.badges);
     }
 
     /** Boss prep: take one of the counter Pokémon (release screen if the team is full). */
@@ -1345,6 +1361,19 @@ public final class RunManager {
             return;
         }
         switch (state.nodeChoices.get(index)) {
+            case META -> {
+                state.encounterOptions = Encounters.rollMeta(state, rng(state, 1));
+                state.coopPicks.clear();
+                state.coopOptions.clear();
+                if (state.isCoop()) {
+                    List<UUID> members = state.members();
+                    for (int i = 0; i < members.size(); i++) {
+                        state.coopOptions.put(members.get(i), i == 0 ? new ArrayList<>(state.encounterOptions)
+                                : Encounters.rollMeta(state, rng(state, 4 + 97 * i)));
+                    }
+                }
+                state.phase = Phase.ENCOUNTER;
+            }
             case ROUTE -> {
                 String biome = index < state.nodeBiomes.size() ? state.nodeBiomes.get(index) : "";
                 if (!biome.isEmpty()) {
@@ -1826,6 +1855,10 @@ public final class RunManager {
             if (guaranteed) {
                 state.legendaryOfferedAt = state.badges;
             }
+        } else if (!Modifiers.has(state, Modifiers.SOLO) && state.badges >= config.metaEncounterFromBadge
+                && random.nextDouble() < config.metaEncounterChance) {
+            // Rare encounter: strong competitive Pokémon instead of the biome's spawns.
+            nodes.set(random.nextInt(nodes.size()), NodeType.META);
         }
         return nodes;
     }

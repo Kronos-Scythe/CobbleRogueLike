@@ -67,15 +67,17 @@ public final class ShopCatalog {
         unlocks.add(new Entry("gimmick:tera", "mega_showdown:tera_orb", "Terastallization", config.gimmickUnlockPrice, UNLOCK));
         unlocks.add(new Entry("gimmick:dynamax", "mega_showdown:dynamax_band", "Dynamax", config.gimmickUnlockPrice, UNLOCK));
         result.add(new Category("Gimmicks", "mega_showdown:mega_bracelet", unlocks));
-        addTagCategory(result, "Mega Stones", "mega_showdown:mega_stone", config.megaStonePrice, HOLD);
-        addTagCategory(result, "Z-Crystals", "mega_showdown:z_crystal", config.zCrystalPrice, HOLD);
-        addTagCategory(result, "Tera Shards", "mega_showdown:tera_shard", config.teraShardPrice, USE);
+        addTagCategory(result, "Mega Stones", "mega_showdown:mega_stone",
+                id -> config.megaStonePrices.getOrDefault(id.substring(id.indexOf(':') + 1), config.megaStonePrice), HOLD);
+        addTagCategory(result, "Z-Crystals", "mega_showdown:z_crystal", id -> config.zCrystalPrice, HOLD);
+        addTagCategory(result, "Tera Shards", "mega_showdown:tera_shard", id -> config.teraShardPrice, USE);
     }
 
-    private static void addTagCategory(List<Category> result, String name, String tag, int price, String action) {
+    private static void addTagCategory(List<Category> result, String name, String tag,
+                                       java.util.function.ToIntFunction<String> price, String action) {
         List<Entry> entries = new ArrayList<>();
         for (String id : ItemBridge.itemsInTag(tag)) {
-            entries.add(new Entry(id, id, null, price, action));
+            entries.add(new Entry(id, id, null, price.applyAsInt(id), action));
         }
         if (!entries.isEmpty()) {
             result.add(new Category(name, entries.get(0).icon(), entries));

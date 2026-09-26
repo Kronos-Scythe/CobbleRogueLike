@@ -319,6 +319,11 @@ public final class RogueMenus {
                                 Text.literal("The final battle, Lv. " + Scaling.levelCap(state.badges)),
                                 Text.literal(bossDoubles() ? "Double battle" : "Single battle").formatted(Formatting.YELLOW))),
                         p -> RunManager.get().chooseNode(p, index));
+                case META -> menu.button(CHOICE_SLOTS[i], Menu.stack("cobblemon:ultra_ball",
+                        Text.literal("Rare encounter").formatted(Formatting.GOLD, Formatting.BOLD), List.of(
+                                Text.literal("Strong competitive Pokémon."),
+                                Text.literal("Catch 1 of 3."))),
+                        p -> RunManager.get().chooseNode(p, index));
                 case LEGENDARY -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:nether_star",
                         Text.literal("Legendary").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), List.of(
                                 Text.literal("Beat it and it joins you."),
@@ -436,9 +441,12 @@ public final class RogueMenus {
         }
         if (config.prepHeal) {
             boolean used = RunManager.prepUsed(state, player, "heal");
+            int price = RunManager.prepHealPrice(state);
             menu.button(5, Menu.stack(used ? "minecraft:gray_dye" : "cobblemon:full_restore",
                     Text.literal("Full heal").formatted(used ? Formatting.GRAY : Formatting.LIGHT_PURPLE), List.of(
                             Text.literal("Restore your team's HP, PP and status."),
+                            price == 0 ? Text.literal("Free before the first gym").formatted(Formatting.GREEN)
+                                    : Text.literal(price + " coins").formatted(state.money >= price ? Formatting.GOLD : Formatting.RED),
                             used ? Text.literal("Used").formatted(Formatting.GRAY) : Text.literal("Click to heal").formatted(Formatting.YELLOW))),
                     p -> RunManager.get().prepHeal(p));
         }

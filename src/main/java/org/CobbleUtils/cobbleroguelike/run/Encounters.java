@@ -28,10 +28,12 @@ public final class Encounters {
         int level = Scaling.encounterLevel(state);
         int count = config.encounterOptions;
 
-        List<Candidate> all = SpawnData.candidates(biome);
+        List<Candidate> all = flattenRarity(SpawnData.candidates(biome), state.badges);
+        // With evolveEncounters, weaker basics are fine late on: they come evolved.
+        int minBst = Scaling.minBst(level) - 80 - (config.evolveEncounters ? 120 : 0);
         List<Candidate> pool = new ArrayList<>();
         for (Candidate candidate : all) {
-            if (candidate.bst() >= Scaling.minBst(level) - 80 && candidate.bst() <= Scaling.maxBst(level) + 20) {
+            if (candidate.bst() >= minBst && candidate.bst() <= Scaling.maxBst(level) + 20) {
                 pool.add(candidate);
             }
         }
@@ -55,9 +57,74 @@ public final class Encounters {
 
         List<String> result = new ArrayList<>();
         for (Candidate picked : pickWeighted(pool, count, random)) {
-            result.add(withExtras(picked.properties() + " level=" + level, random));
+            String properties = picked.properties() + " level=" + level;
+            if (config.evolveEncounters) {
+                properties = CobblemonBridge.evolvedForLevel(properties, level, config.itemEvolutionLevel,
+                        config.otherEvolutionLevel, random);
+            }
+            result.add(withExtras(properties, random));
         }
         return result;
+    }
+
+    /**
+     * Rare spawns get more common with each badge: weights are flattened toward each other
+     * (weight^(1 - t), t = encounterRarityPerBadge * badges, at most 0.6).
+     */
+    private static List<Candidate> flattenRarity(List<Candidate> candidates, int badges) {
+        double t = Math.max(0, Math.min(0.6, RogueConfig.get().encounterRarityPerBadge * badges));
+        if (t <= 0) {
+            return candidates;
+        }
+        List<Candidate> result = new ArrayList<>();
+        for (Candidate candidate : candidates) {
+            int weight = (int) Math.max(1, Math.round(100 * Math.pow(Math.max(1, candidate.weight()), 1 - t)));
+            result.add(new Candidate(candidate.properties(), candidate.species(), weight, candidate.bst()));
+        }
+        return result;
+    }
+
+    /**
+     * Rare encounter: 3 strong competitive Pokémon (the config meta pools) at route level. The top
+     * pool joins in from {@code metaTopFromBadge} badges.
+     */
+    public static List<String> rollMeta(RunState state, Random random) {
+        RogueConfig config = RogueConfig.get();
+        int level = Scaling.encounterLevel(state);
+        List<String> pool = new ArrayList<>();
+        for (String species : config.metaPoolStrong) {
+            addIfExists(pool, species);
+        }
+        if (state.badges >= config.metaTopFromBadge) {
+            for (String species : config.metaPoolTop) {
+                addIfExists(pool, species);
+                addIfExists(pool, species); // top picks count twice
+            }
+        }
+        List<String> result = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        while (result.size() < config.encounterOptions && !pool.isEmpty()) {
+            String picked = pool.remove(random.nextInt(pool.size()));
+            if (!seen.add(picked)) {
+                continue;
+            }
+            String properties = picked + " level=" + level;
+            if (random.nextDouble() < config.metaHiddenAbilityChance) {
+                properties += " hiddenability=yes";
+            }
+            if (random.nextDouble() < config.shinyChance) {
+                properties += " shiny=yes";
+            }
+            result.add(properties);
+        }
+        return result.isEmpty() ? roll(state, random) : result;
+    }
+
+    private static void addIfExists(List<String> pool, String properties) {
+        String species = properties.split(" ")[0];
+        if (CobblemonBridge.speciesById(species) != null) {
+            pool.add(properties);
+        }
     }
 
     /**
