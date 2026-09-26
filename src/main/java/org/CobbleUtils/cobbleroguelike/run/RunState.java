@@ -6,7 +6,11 @@ import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /** Progress of one player's run. Persisted after every change. */
@@ -21,6 +25,12 @@ public final class RunState {
     public Phase phase = Phase.CHOOSE_NODE;
     public int floor = 0;
     public int badges = 0;
+    /** Run currency. Earned in battles, spent in the shop, and gone when the run ends. */
+    public int money = 0;
+    /** Run bag: item id to count. It is purely virtual and never touches the real inventory. */
+    public Map<String, Integer> bag = new LinkedHashMap<>();
+    /** Mega Showdown gimmicks unlocked for this run: mega, z, dynamax, tera. */
+    public Set<String> gimmicks = new LinkedHashSet<>();
     public List<String> usedGymTypes = new ArrayList<>();
     public List<NodeType> nodeChoices = new ArrayList<>();
     /** Property strings, e.g. {@code "zubat level=7"}. */
@@ -41,6 +51,28 @@ public final class RunState {
         this.seed = seed;
     }
 
+    public int bagCount(String itemId) {
+        return bag.getOrDefault(itemId, 0);
+    }
+
+    public void addToBag(String itemId, int count) {
+        if (count > 0) {
+            bag.merge(itemId, count, Integer::sum);
+        }
+    }
+
+    /** Removes up to {@code count}; returns how many were removed. */
+    public int takeFromBag(String itemId, int count) {
+        int have = bagCount(itemId);
+        int taken = Math.min(have, Math.max(0, count));
+        if (have - taken <= 0) {
+            bag.remove(itemId);
+        } else {
+            bag.put(itemId, have - taken);
+        }
+        return taken;
+    }
+
     public void clearBattle() {
         battleKind = NodeType.TRAINER;
         battleName = "";
@@ -56,6 +88,11 @@ public final class RunState {
         tag.putString("phase", phase.name());
         tag.putInt("floor", floor);
         tag.putInt("badges", badges);
+        tag.putInt("money", money);
+        NbtCompound bagTag = new NbtCompound();
+        bag.forEach(bagTag::putInt);
+        tag.put("bag", bagTag);
+        tag.put("gimmicks", writeStrings(new ArrayList<>(gimmicks)));
         tag.put("usedGymTypes", writeStrings(usedGymTypes));
         tag.put("nodeChoices", writeStrings(nodeChoices.stream().map(Enum::name).toList()));
         tag.put("encounterOptions", writeStrings(encounterOptions));
@@ -74,6 +111,15 @@ public final class RunState {
         state.phase = parse(Phase.class, tag.getString("phase"), Phase.CHOOSE_NODE);
         state.floor = tag.getInt("floor");
         state.badges = tag.getInt("badges");
+        state.money = tag.getInt("money");
+        NbtCompound bagTag = tag.getCompound("bag");
+        for (String key : bagTag.getKeys()) {
+            int count = bagTag.getInt(key);
+            if (count > 0) {
+                state.bag.put(key, count);
+            }
+        }
+        state.gimmicks.addAll(readStrings(tag, "gimmicks"));
         state.usedGymTypes = readStrings(tag, "usedGymTypes");
         for (String node : readStrings(tag, "nodeChoices")) {
             NodeType type = parse(NodeType.class, node, null);

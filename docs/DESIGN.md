@@ -44,7 +44,7 @@ The whole run is played through server-side chest menus (`/rogue`). There's no d
       │  Route      : pick ONE of 3 wild Pokémon to join (or skip)      │
       │  Rest stop  : full heal                                         │
       │  Trainer    : generated AI trainer battle                       │
-      │  Shop/Event : run currency, items             (later)           │
+      │  Shop & Bag : always available from every run menu              │
       │  ► Gym every 5th floor: random type, ace at the cap; badge      │
       │  ► After 8 badges: the Champion. Beat them to win the run       │
       └─────────────────────────────────────────────────────────────────┘
@@ -85,6 +85,27 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
 | Gyms 3–4 | smarter | Tera on bosses | 4–5 |
 | Gyms 5–6 | smart | Tera, Mega | 5–6 |
 | Gyms 7–8, E4, Champ | best | all, legends on Champ | 6 |
+
+---
+
+### Economy, shop and bag
+
+- **Coins** exist only for the run. You start with `startingMoney` (1500). Each win pays `trainerRewardBase + strongestLevel × trainerRewardPerLevel`: ×4 for gyms and ×8 for the Champion.
+- The **shop** is open from every run menu between battles. Its categories are Healing, Battle Items (competitive held items), Type Boosters, Berries, Training (candies, vitamins, ability capsule/patch, all mints) and Evolution. Left-click buys 1 and right-click buys 5. Categories, items and prices live in the config, and unknown item ids are hidden.
+- The **bag** is virtual run state and never touches the real inventory. Clicking an item and then a Pokémon either **uses** it (potions, revives, mints, vitamins, stones: Cobblemon's own item logic runs on a temporary stack) or **gives** it to hold (the old held item goes back to the bag). The party row shows HP and held items, and clicking a Pokémon moves its held item into the bag. That's how items move between Pokémon.
+- Held items can only change through the bag during a run (the held-item guard has a bypass just for it). Everything in the bag and on rogue Pokémon disappears when the run ends.
+- Candy is refused at the level cap. Bag items can't be used in battle yet: the Bag Clause is on, because Cobblemon hands used battle items back to the real inventory when a battle ends.
+
+### Mega Showdown (optional)
+
+When `mega_showdown` is installed, the shop adds:
+- **Gimmick unlocks:** Mega Evolution, Z-Moves, Terastallization and Dynamax.
+- **Mega Stones** and **Z-Crystals** as held items.
+- **Tera Shards**, used from the bag with Mega Showdown's own logic, which needs its configured number of shards.
+
+These are listed from Mega Showdown's item tags, so there's no compile-time dependency.
+
+Unlocks don't hand out real key items. A `@Pseudo` mixin on Mega Showdown's `AccessoriesUtils` makes the matching key-item check succeed for run players who bought the unlock, and returns a virtual, fully charged Tera Orb. Nothing can leak into the main world, and Mega Showdown's own rules still apply: config toggles, one Mega per battle, and Power Spots for Dynamax if configured.
 
 ---
 
@@ -156,7 +177,7 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
 
 1. **Done (untested build):** journaled party swap and restore, crash recovery, guards, `/rogue` menus, partner picker (a copy of your own Pokémon), route (pick 1 of 3), rest, and the release screen.
 2. **Done (untested build):** trainer nodes, gyms every 5 floors, the Champion, run level cap, losing ends the run.
-3. **Economy:** run money, a shop node, items as run state applied in battle.
+3. **Done (untested build):** run coins, an always-open shop, the run bag with held-item management, and optional Mega Showdown gimmicks. Next: using bag items during battles, and gimmicks for gym leaders.
 4. **Meta:** the quest board, Rogue Tokens and the vendor.
 5. **Modifiers:** Nuzlocke, Solo, Doubles, Rainbow, Gauntlet.
 6. **Co-op:** invites, multi battles.

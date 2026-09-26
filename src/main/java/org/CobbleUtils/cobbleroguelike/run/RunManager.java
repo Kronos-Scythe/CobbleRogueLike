@@ -16,6 +16,7 @@ import org.CobbleUtils.cobbleroguelike.compat.CobblemonBattles;
 import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
 import org.CobbleUtils.cobbleroguelike.run.RunState.NodeType;
 import org.CobbleUtils.cobbleroguelike.run.RunState.Phase;
+import org.CobbleUtils.cobbleroguelike.shop.ShopCatalog;
 import org.CobbleUtils.cobbleroguelike.ui.RogueMenus;
 import org.CobbleUtils.cobbleroguelike.util.Scheduler;
 
@@ -250,6 +251,7 @@ public final class RunManager {
             }
             CobblemonBridge.party(player).add(partner);
             RunState state = new RunState(id, new Random().nextLong());
+            state.money = RogueConfig.get().startingMoney;
             advanceFloor(state);
             storage.writeRun(state);
             active.put(id, state);
@@ -455,6 +457,8 @@ public final class RunManager {
                     + (state.badges == 1 ? "" : "s") + ". Your run is over.");
             return;
         }
+        int reward = battleReward(state);
+        state.money += reward;
         switch (state.battleKind) {
             case CHAMPION -> {
                 finish(player, "You defeated " + state.battleName + "! Your run is complete!");
@@ -471,6 +475,7 @@ public final class RunManager {
             }
             default -> message(player, "You defeated " + state.battleName + "!", Formatting.GREEN);
         }
+        message(player, "+" + reward + " coins (" + state.money + " total).", Formatting.GOLD);
         state.clearBattle();
         advanceFloor(state);
         save(player, state);
@@ -577,6 +582,54 @@ public final class RunManager {
         state.floor++;
         state.phase = Phase.CHOOSE_NODE;
         state.nodeChoices = rollNodes(state);
+    }
+
+    /** Coins for beating the prepared battle: base + strongest level * perLevel, multiplied for bosses. */
+    private static int battleReward(RunState state) {
+        RogueConfig config = RogueConfig.get();
+        int maxLevel = 1;
+        for (String member : state.battleTeam) {
+            for (String part : member.split(" ")) {
+                if (part.startsWith("level=")) {
+                    try {
+                        maxLevel = Math.max(maxLevel, Integer.parseInt(part.substring(6)));
+                    } catch (NumberFormatException ignored) {
+                        // keep the current max
+                    }
+                }
+            }
+        }
+        double multiplier = switch (state.battleKind) {
+            case GYM -> config.gymRewardMultiplier;
+            case CHAMPION -> config.championRewardMultiplier;
+            default -> 1.0;
+        };
+        return (int) Math.round((config.trainerRewardBase + maxLevel * config.trainerRewardPerLevel) * multiplier);
+    }
+
+    /** Saves run state changed from outside this class (e.g. the shop). */
+    public void persist(ServerPlayerEntity player, RunState state) {
+        save(player, state);
+    }
+
+    /**
+     * Used by the Mega Showdown mixin: true if the player is in a run that unlocked the gimmick
+     * granted by the given key-item tag (e.g. {@code mega_bracelet}).
+     */
+    public static boolean hasGimmickTag(ServerPlayerEntity player, String tagPath) {
+        if (instance == null) {
+            return false;
+        }
+        RunState state = instance.active.get(player.getUuid());
+        if (state == null) {
+            return false;
+        }
+        for (String gimmick : state.gimmicks) {
+            if (tagPath.equals(ShopCatalog.GIMMICK_TAGS.get(gimmick))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void save(ServerPlayerEntity player, RunState state) {

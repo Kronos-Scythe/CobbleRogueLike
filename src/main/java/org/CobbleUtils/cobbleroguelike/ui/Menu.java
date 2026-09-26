@@ -27,7 +27,13 @@ public final class Menu {
     private final Text title;
     private final int rows;
     private final SimpleInventory inventory;
-    private final Map<Integer, Consumer<ServerPlayerEntity>> actions = new HashMap<>();
+    /** A click on a menu slot. {@code rightClick} is true for a right click. */
+    @FunctionalInterface
+    public interface ClickAction {
+        void click(ServerPlayerEntity player, boolean rightClick);
+    }
+
+    private final Map<Integer, ClickAction> actions = new HashMap<>();
 
     public Menu(Text title) {
         this(title, 3);
@@ -41,6 +47,11 @@ public final class Menu {
     }
 
     public Menu button(int slot, ItemStack icon, Consumer<ServerPlayerEntity> action) {
+        return clickButton(slot, icon, action == null ? null : (player, rightClick) -> action.accept(player));
+    }
+
+    /** Like {@link #button} but the action also learns whether it was a right click. */
+    public Menu clickButton(int slot, ItemStack icon, ClickAction action) {
         inventory.setStack(slot, icon);
         if (action != null) {
             actions.put(slot, action);
@@ -49,7 +60,7 @@ public final class Menu {
     }
 
     public Menu icon(int slot, ItemStack icon) {
-        return button(slot, icon, null);
+        return clickButton(slot, icon, null);
     }
 
     int rows() {
@@ -60,7 +71,7 @@ public final class Menu {
         return inventory;
     }
 
-    Consumer<ServerPlayerEntity> action(int slot) {
+    ClickAction action(int slot) {
         return actions.get(slot);
     }
 

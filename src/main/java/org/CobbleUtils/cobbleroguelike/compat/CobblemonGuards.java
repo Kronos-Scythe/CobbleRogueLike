@@ -11,6 +11,9 @@ import org.CobbleUtils.cobbleroguelike.run.RunManager;
 /** Cobblemon event hooks that stop rogue Pokémon from interacting with the main game. */
 public final class CobblemonGuards {
 
+    /** Set while the run bag swaps a held item, so the held-item guard lets it through. */
+    public static boolean allowHeldItemChange = false;
+
     private CobblemonGuards() {
     }
 
@@ -59,10 +62,13 @@ public final class CobblemonGuards {
 
         // Held-item swaps would move items between the rogue party and the real inventory.
         CobblemonEvents.HELD_ITEM_PRE.subscribe(Priority.NORMAL, event -> {
+            if (allowHeldItemChange) {
+                return;
+            }
             ServerPlayerEntity player = event.getPokemon().getOwnerPlayer();
             if (player != null && RunManager.isInRun(player)) {
                 event.cancel();
-                RunManager.message(player, "Held items can't be changed during a run.", Formatting.RED);
+                RunManager.message(player, "Use the run Bag (/rogue → Bag) to change held items during a run.", Formatting.RED);
             }
         });
     }

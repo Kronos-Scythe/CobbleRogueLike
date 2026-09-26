@@ -8,7 +8,6 @@ import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.server.network.ServerPlayerEntity;
 
-import java.util.function.Consumer;
 
 /** Container screen that never moves items and turns clicks into menu actions. */
 public final class MenuScreenHandler extends GenericContainerScreenHandler {
@@ -27,11 +26,12 @@ public final class MenuScreenHandler extends GenericContainerScreenHandler {
     public void onSlotClick(int slotIndex, int button, SlotActionType actionType, PlayerEntity player) {
         if (!clicked && actionType == SlotActionType.PICKUP && player instanceof ServerPlayerEntity serverPlayer
                 && slotIndex >= 0 && slotIndex < menu.inventory().size()) {
-            Consumer<ServerPlayerEntity> action = menu.action(slotIndex);
+            Menu.ClickAction action = menu.action(slotIndex);
             if (action != null) {
                 clicked = true;
+                boolean rightClick = button == 1;
                 // Run after the click packet is handled, since actions usually open another screen.
-                serverPlayer.getServer().execute(() -> action.accept(serverPlayer));
+                serverPlayer.getServer().execute(() -> action.click(serverPlayer, rightClick));
             }
         }
         // Undo whatever the client predicted.

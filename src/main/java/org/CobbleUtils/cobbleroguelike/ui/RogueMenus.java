@@ -229,7 +229,13 @@ public final class RogueMenus {
     private static void addControls(Menu menu, RunState state) {
         menu.icon(18, Menu.stack("minecraft:map", Text.literal("Floor " + state.floor).formatted(Formatting.WHITE), List.of(
                 Text.literal("Badges: " + state.badges + "/" + RogueConfig.get().gymCount),
-                Text.literal("Level cap: " + Scaling.levelCap(state.badges)))));
+                Text.literal("Level cap: " + Scaling.levelCap(state.badges)),
+                Text.literal("Coins: " + state.money).formatted(Formatting.GOLD))));
+        menu.button(19, Menu.stack("minecraft:emerald", Text.literal("Shop").formatted(Formatting.GREEN), List.of(
+                Text.literal(state.money + " coins"),
+                Text.literal("Healing, battle items, training..."))), ShopMenus::shop);
+        menu.button(20, Menu.stack("minecraft:chest", Text.literal("Bag & team items").formatted(Formatting.AQUA), List.of(
+                Text.literal("Use items and manage held items."))), p -> ShopMenus.bag(p, 0));
         menu.button(26, Menu.stack("minecraft:barrier", Text.literal("End run").formatted(Formatting.RED), List.of()),
                 p -> hub(p, true));
     }
