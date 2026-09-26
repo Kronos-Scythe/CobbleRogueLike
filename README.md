@@ -34,6 +34,10 @@ The Gradle daemon runs on Java 25 (see `gradle/gradle-daemon-jvm.properties`). T
    - **Rest stop:** full heal.
    - **Legendary:** fight a legendary and it joins you if you win (after badges 2, 4 and 6, and rarely otherwise).
 3. **Every 5th floor is a gym.** It has a random type, a double battle, a competitive team and a badge. Your run level cap rises with each badge.
+   Before any boss (gym, Elite Four, Champion) you get free **Boss prep**, once each per boss and per player:
+   - **Train to level cap:** one click, no grinding; moves and evolutions happen as usual.
+   - **Draft a counter:** pick 1 of 3 Pokémon at the cap that are strong against the boss's type.
+   - **Full heal.**
 4. **After 8 badges**, 4 Elite Four battles, then **the Champion**. Beat them to win.
 5. **Losing or forfeiting ends the run.** Either way you earn **Rogue Tokens** to spend in the Rogue Shop.
 6. **Save & leave** any time between battles. Your real party comes back so you can play normally, and you can continue the run later from `/rogue`.
@@ -105,6 +109,7 @@ Run modifiers (Nuzlocke, Hard…) stay optional. To make the game easier, lower 
 
 - **Levels and pacing:** `starterLevel`, `resetStarterLevel`, `gymEvery`, `gymCount`, `levelCaps`, `gymTeamSizes`, `eliteCount`, `eliteEvery`
 - **Co-op:** `coopPartyLimit` (3), `coopMaxDistance`, `coopInviteSeconds`
+- **Balance:** `expMultiplier` (2× EXP for run Pokémon), `prepTrainToCap`, `prepDraft`, `prepHeal`, `prepDraftOptions`
 - **Difficulty:** `setTierBonus`, `maxTrainerAi`, `trainerArchetypesFromBadge`, `healAfterGym`, `healAfterElite`
 - **Battles:** `bossArchetypes`, `archetypeFromBadge`, `bossTeraFromBadge`, `bossMegaFromBadge`, `doubleBattles` (`bosses` / `all` / `none`), `doubleTrainerChance`, `bossGimmicks`
 - **Encounters:** `biomes` (Minecraft/Cobblemon biome ids and `#tags`, plus theme types), spawn bucket weights, `shinyChance`, `hiddenAbilityChance`, and the legendary settings

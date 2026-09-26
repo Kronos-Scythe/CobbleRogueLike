@@ -78,6 +78,10 @@ public final class RunState {
     public String battleGimmick = "";
     /** Team style of the upcoming boss, e.g. "Rain" or "Trick Room" (empty for a plain team). */
     public String battleArchetype = "";
+    /** Boss prep: counter Pokémon offered by "Draft a counter" (property strings with level). */
+    public List<String> draftOptions = new ArrayList<>();
+    /** Boss prep actions already used, as "uuid:train", "uuid:draft", "uuid:heal". */
+    public Set<String> prepUsed = new HashSet<>();
 
     public RunState(UUID playerId, long seed) {
         this.playerId = playerId;
@@ -134,6 +138,8 @@ public final class RunState {
         battleDoubles = false;
         battleGimmick = "";
         battleArchetype = "";
+        draftOptions = new ArrayList<>();
+        prepUsed = new HashSet<>();
     }
 
     public NbtCompound toNbt() {
@@ -180,6 +186,8 @@ public final class RunState {
         tag.putBoolean("battleDoubles", battleDoubles);
         tag.putString("battleGimmick", battleGimmick);
         tag.putString("battleArchetype", battleArchetype);
+        tag.put("draftOptions", writeStrings(draftOptions));
+        tag.put("prepUsed", writeStrings(new ArrayList<>(prepUsed)));
         return tag;
     }
 
@@ -237,6 +245,8 @@ public final class RunState {
         state.battleDoubles = tag.getBoolean("battleDoubles");
         state.battleGimmick = tag.getString("battleGimmick");
         state.battleArchetype = tag.getString("battleArchetype");
+        state.draftOptions = readStrings(tag, "draftOptions");
+        state.prepUsed.addAll(readStrings(tag, "prepUsed"));
         return state;
     }
 

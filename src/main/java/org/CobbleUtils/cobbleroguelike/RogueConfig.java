@@ -355,6 +355,16 @@ public final class RogueConfig {
     /** Normal trainers with 3+ Pokémon use team archetypes from this many badges on (-1 = never). */
     public int trainerArchetypesFromBadge = 0;
 
+    // ---------------------------------------------------------------- balance
+
+    /** EXP multiplier for run Pokémon (still capped at the level cap). */
+    public double expMultiplier = 2.0;
+    /** Boss prep on gym / Elite Four / Champion previews, once per boss and per player: */
+    public boolean prepTrainToCap = true;
+    public boolean prepDraft = true;
+    public boolean prepHeal = true;
+    public int prepDraftOptions = 3;
+
     // ---------------------------------------------------------------- boss archetypes
 
     /**
