@@ -28,7 +28,8 @@ public final class TutorMenus {
         if (state == null) {
             return;
         }
-        Menu menu = new Menu(Text.literal("Move Tutor - " + state.money + " coins"));
+        Menu menu = new Menu(Text.literal("Move Tutor - " + state.money + " coins")).layout(Menu.Layout.CARDS)
+                .screenTitle(Text.literal("Move Tutor"));
         List<Pokemon> party = CobblemonBridge.partyMembers(player);
         for (int i = 0; i < party.size() && i < 6; i++) {
             int index = i;
@@ -47,8 +48,7 @@ public final class TutorMenus {
                 Text.literal("TM, tutor and egg moves cost " + RogueConfig.get().moveTutorPrice + " coins."),
                 Text.literal("Replaced moves can be swapped back in"),
                 Text.literal("from the Pokémon's summary screen."))));
-        menu.button(22, Menu.stack("minecraft:oak_door", Text.literal("Back to run"), List.of()),
-                p -> RunManager.get().openCurrent(p));
+        menu.back(22, "Back to run", p -> RunManager.get().openCurrent(p));
         menu.open(player);
     }
 
@@ -66,7 +66,8 @@ public final class TutorMenus {
         List<MoveBridge.Teachable> moves = MoveBridge.teachable(pokemon);
         int pages = Math.max(1, (moves.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         int current = Math.max(0, Math.min(page, pages - 1));
-        Menu menu = new Menu(Text.literal(pokemon.getSpecies().getName() + " - " + state.money + " coins"), 6);
+        Menu menu = new Menu(Text.literal(pokemon.getSpecies().getName() + " - " + state.money + " coins"), 6)
+                .screenTitle(Text.literal("Move Tutor - " + pokemon.getSpecies().getName()));
         int price = RogueConfig.get().moveTutorPrice;
         for (int slot = 0; slot < PAGE_SIZE; slot++) {
             int index = current * PAGE_SIZE + slot;
@@ -90,12 +91,12 @@ public final class TutorMenus {
             menu.icon(22, Menu.stack("minecraft:barrier", Text.literal("Nothing new to learn").formatted(Formatting.RED), List.of()));
         }
         if (current > 0) {
-            menu.button(45, Menu.stack("minecraft:arrow", Text.literal("Previous page"), List.of()), p -> moves(p, partyIndex, current - 1));
+            menu.footer(45, Menu.stack("minecraft:arrow", Text.literal("Previous page"), List.of()), p -> moves(p, partyIndex, current - 1));
         }
         if (current < pages - 1) {
-            menu.button(53, Menu.stack("minecraft:arrow", Text.literal("Next page"), List.of()), p -> moves(p, partyIndex, current + 1));
+            menu.footer(53, Menu.stack("minecraft:arrow", Text.literal("Next page"), List.of()), p -> moves(p, partyIndex, current + 1));
         }
-        menu.button(49, Menu.stack("minecraft:oak_door", Text.literal("Back"), List.of()), TutorMenus::pickPokemon);
+        menu.back(49, "Back", TutorMenus::pickPokemon);
         menu.open(player);
     }
 
@@ -106,7 +107,7 @@ public final class TutorMenus {
             return;
         }
         Pokemon pokemon = party.get(partyIndex);
-        Menu menu = new Menu(Text.literal("Replace which move?"));
+        Menu menu = new Menu(Text.literal("Replace which move?")).layout(Menu.Layout.CARDS);
         menu.icon(4, Menu.stack("minecraft:enchanted_book", move.displayName().copy().formatted(Formatting.AQUA), List.of(
                 Text.literal(capitalize(move.type()) + " - " + capitalize(move.category())))));
         List<Text> current = MoveBridge.currentMoves(pokemon);
@@ -118,7 +119,7 @@ public final class TutorMenus {
                             Text.literal(name == null ? "Click to learn here." : "Click to forget this move.").formatted(Formatting.YELLOW))),
                     p -> TutorService.teach(p, partyIndex, move.name(), slot));
         }
-        menu.button(22, Menu.stack("minecraft:oak_door", Text.literal("Cancel"), List.of()), p -> moves(p, partyIndex, 0));
+        menu.back(22, "Cancel", p -> moves(p, partyIndex, 0));
         menu.open(player);
     }
 

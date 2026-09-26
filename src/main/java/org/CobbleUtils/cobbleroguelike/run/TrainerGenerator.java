@@ -97,7 +97,7 @@ public final class TrainerGenerator {
             state.battleTeam = strengthen(state, state.battleDoubles, random);
         }
         applyGimmick(state, random);
-        if (boss) {
+        if (boss && Modifiers.has(state, Modifiers.DRAFT)) {
             rollDraft(state, random);
         }
         if (state.isCoop()) {

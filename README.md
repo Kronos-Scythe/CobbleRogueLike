@@ -38,13 +38,13 @@ The Gradle daemon runs on Java 25 (see `gradle/gradle-daemon-jvm.properties`). T
 3. **Every 5th floor is a gym.** It has a random type, a double battle, a competitive team and a badge. Your run level cap rises with each badge.
    Before any boss (gym, Elite Four, Champion) you get free **Boss prep**, once each per boss and per player:
    - **Train to level cap:** one click, no grinding; moves and evolutions happen as usual.
-   - **Draft a counter:** pick 1 of 3 Pokémon at the cap that are strong against the boss's type.
    - **Full heal.**
+   - **Draft a counter** (only with the Counter Draft modifier): pick 1 of 3 Pokémon at the cap that are strong against the boss's type.
 4. **After 8 badges**, 4 Elite Four battles, then **the Champion**. Beat them to win.
 5. **Losing or forfeiting ends the run.** Either way you earn **Rogue Tokens** to spend in the Rogue Shop.
 6. **Save & leave** any time between battles. Your real party comes back so you can play normally, and you can continue the run later from `/rogue`.
 
-With the mod installed on your client you get a **run screen** like Battle Tower's: your team (and your partner's in co-op) on the left, floor, badges, coins and a floor tower up to the next gym in the middle, and the options on the right, themed with the biome's blocks. Without it (server-only install) the same menus open as chests.
+With the mod installed on your client you get a **run screen** like Battle Tower's: your team (and your partner's in co-op) on the left, floor, badges and a floor tower up to the next gym in the middle, and the options on the right as cards, a grid or a list, themed with the biome's blocks. Coins sit in the top-right corner, **Close** in the bottom-left and **Back** (when there's somewhere to go back to) in the bottom-right. Without the mod on the client (server-only install) the same menus open as chests.
 
 Every run screen has a **nav bar** along the bottom:
 
@@ -55,10 +55,9 @@ Every run screen has a **nav bar** along the bottom:
 | Bag | Use items, give or take held items, and move items between Pokémon |
 | Move Tutor | Level-up moves are free; TM, tutor and egg moves cost coins |
 | Save & leave | Put the run away and get your real party back; continue later from `/rogue` |
-| How to play | A quick guide |
 | End run | Ends the run (asks for confirmation first) |
 
-Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue saved run** / **End saved run**), **Co-op run**, **How to play** and the **Rogue Shop**. The Rogue Shop is only available here, not during a run.
+Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue saved run**) and **Co-op run**, with **How to play** (its own page) and the **Rogue Shop** as buttons along the bottom. The Rogue Shop is only available here, not during a run.
 
 ### Features
 
@@ -69,7 +68,7 @@ Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue sav
   - Gym leaders from the 2nd gym, plus the Elite Four and the Champion, build teams around a plan: **Rain, Sun, Sandstorm, Snow, Trick Room, Tailwind** or **Electric / Psychic / Grassy Terrain**.
   - Each team has a setter that leads, abusers (Swift Swim, Chlorophyll, slow hard hitters under Trick Room…) and, in doubles, a Fake Out / Follow Me / Intimidate support.
   - Gyms pick a style that fits their type, and the battle preview shows it.
-- **Modifiers:** Nuzlocke, Solo, Hard, No Shop and All Doubles, each with a token bonus.
+- **Modifiers:** Nuzlocke, Solo, Hard, No Shop and All Doubles, each with a token bonus, and Counter Draft (a boss prep option to draft a counter Pokémon, no bonus).
 - **Co-op runs** (inspired by Coop+):
   - Invite a friend from the start page or with `/rogue invite <player>`.
   - Each of you picks your own partner and keeps **up to 3 Pokémon**. Floors, badges and coins are shared.

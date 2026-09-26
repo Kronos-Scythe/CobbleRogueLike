@@ -27,7 +27,8 @@ public final class RewardMenus {
             return;
         }
         int tokens = RunManager.get().tokens(player);
-        Menu menu = new Menu(Text.literal("Rogue Shop - " + tokens + " tokens"), 6);
+        Menu menu = new Menu(Text.literal("Rogue Shop - " + tokens + " tokens"), 6).layout(Menu.Layout.CARDS)
+                .screenTitle(Text.literal("Rogue Shop"));
         List<RewardService.Category> catalog = RewardService.catalog();
         for (int i = 0; i < catalog.size() && i < CATEGORY_SLOTS.length; i++) {
             int index = i;
@@ -37,8 +38,7 @@ public final class RewardMenus {
                     p -> category(p, index, 0));
         }
         menu.icon(48, profileIcon(player));
-        menu.button(49, Menu.stack("minecraft:oak_door", Text.literal("Back"), List.of()),
-                p -> RunManager.get().openCurrent(p));
+        menu.back(49, "Back", p -> RunManager.get().openCurrent(p));
         menu.open(player);
     }
 
@@ -53,7 +53,8 @@ public final class RewardMenus {
         List<RewardService.Entry> entries = category.items();
         int pages = Math.max(1, (entries.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         int current = Math.max(0, Math.min(page, pages - 1));
-        Menu menu = new Menu(Text.literal(category.name() + " - " + tokens + " tokens"), 6);
+        Menu menu = new Menu(Text.literal(category.name() + " - " + tokens + " tokens"), 6)
+                .screenTitle(Text.literal("Rogue Shop - " + category.name()));
         for (int slot = 0; slot < PAGE_SIZE; slot++) {
             int index = current * PAGE_SIZE + slot;
             if (index >= entries.size()) {
@@ -69,20 +70,20 @@ public final class RewardMenus {
                     (p, right) -> RewardService.buy(p, categoryIndex, entryIndex, right ? 5 : 1, current));
         }
         if (current > 0) {
-            menu.button(45, Menu.stack("minecraft:arrow", Text.literal("Previous page"), List.of()), p -> category(p, categoryIndex, current - 1));
+            menu.footer(45, Menu.stack("minecraft:arrow", Text.literal("Previous page"), List.of()), p -> category(p, categoryIndex, current - 1));
         }
         if (current < pages - 1) {
-            menu.button(53, Menu.stack("minecraft:arrow", Text.literal("Next page"), List.of()), p -> category(p, categoryIndex, current + 1));
+            menu.footer(53, Menu.stack("minecraft:arrow", Text.literal("Next page"), List.of()), p -> category(p, categoryIndex, current + 1));
         }
-        menu.icon(48, profileIcon(player));
-        menu.button(49, Menu.stack("minecraft:oak_door", Text.literal("Back"), List.of()), RewardMenus::shop);
+        menu.icon(48, profileIcon(player)).chestOnly(48);
+        menu.back(49, "Back", RewardMenus::shop);
         menu.open(player);
     }
 
     private static ItemStack profileIcon(ServerPlayerEntity player) {
         NbtCompound profile = RunManager.get().profile(player);
         RogueConfig config = RogueConfig.get();
-        return Menu.stack("minecraft:amethyst_shard", Text.literal(profile.getInt("tokens") + " Rogue Tokens").formatted(Formatting.LIGHT_PURPLE), List.of(
+        return Menu.stack("minecraft:amethyst_shard", Text.literal("Your record").formatted(Formatting.LIGHT_PURPLE), List.of(
                 Text.literal("Runs: " + profile.getInt("runs") + "  Wins: " + profile.getInt("wins")),
                 Text.literal("Best: floor " + profile.getInt("bestFloor") + ", " + profile.getInt("bestBadges") + " badges"),
                 Text.literal(""),

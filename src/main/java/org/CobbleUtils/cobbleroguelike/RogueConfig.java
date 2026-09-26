@@ -380,6 +380,7 @@ public final class RogueConfig {
     public double expMultiplier = 2.0;
     /** Boss prep on gym / Elite Four / Champion previews, once per boss and per player: */
     public boolean prepTrainToCap = true;
+    /** Draft a counter: only in runs with the Counter Draft modifier. */
     public boolean prepDraft = true;
     public boolean prepHeal = true;
     public int prepDraftOptions = 3;
@@ -435,6 +436,8 @@ public final class RogueConfig {
     public double hardTokenBonus = 0.5;
     public double noShopTokenBonus = 0.25;
     public double allDoublesTokenBonus = 0.25;
+    /** Counter Draft makes runs easier, so no bonus by default. */
+    public double draftTokenBonus = 0.0;
 
     /** The /rogue shop reward catalog: real items, bought with Rogue Tokens and kept forever. */
     public List<ShopCategory> tokenShop = new ArrayList<>(List.of(

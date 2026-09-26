@@ -22,12 +22,14 @@ import net.minecraft.util.Language;
 import org.CobbleUtils.cobbleroguelike.ui.RogueNetwork;
 import org.CobbleUtils.cobbleroguelike.ui.RogueView;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The run screen (Battle Tower style): party on the left, run stats and the floor tower in the
- * middle, the current menu's options on the right and the nav bar along the bottom. Everything is
- * drawn from a {@link RogueView}; clicks go back to the server, which decides what happens.
+ * The run screen (Battle Tower style). In a run: party on the left, stats and the floor tower in
+ * the middle, the options on the right. Outside a run the options take the whole width. Close sits
+ * in the bottom-left corner, Back (when the screen has one) in the bottom-right, and footer
+ * buttons in between. Everything is drawn from a {@link RogueView}; clicks go back to the server.
  */
 public final class RogueScreen extends Screen {
 
@@ -42,13 +44,25 @@ public final class RogueScreen extends Screen {
     private static final int GOLD = 0xFFE8B53A;
     private static final int HOVER = 0x40FFFFFF;
     private static final int TEXT = 0xFFFFFFFF;
-    private static final int MUTED = 0xFF8C93A8;
+    private static final int MUTED = 0xFFA8AEC2;
+    private static final int BUTTON_BG = 0xF01C2440;
+    private static final int BUTTON_BORDER = 0xFF4A5680;
+    private static final int CARD_BG = 0xE0202A48;
+    private static final int CARD_BORDER = 0xFF5A4A9A;
+    private static final int INFO_BG = 0x90000000;
+    private static final int INFO_BORDER = 0xFF3A4570;
+
+    // Menu.Layout ordinals
+    private static final int CARDS = 1;
+    private static final int GRID = 2;
+    private static final int PAGE = 3;
 
     private static final int ROW_H = 22;
-    private static final int ROW_GAP = 2;
+    private static final int GAP = 4;
     private static final int PARTY_W = 56;
     private static final int CENTER_W = 124;
     private static final int FOOTER_H = 22;
+    private static final int PAGE_STEP = 12;
 
     /** True while the server swaps this screen for another, so that isn't reported as a close. */
     static boolean replacing;
@@ -56,6 +70,13 @@ public final class RogueScreen extends Screen {
     private final RogueView view;
     private int x0, y0, w, h;
     private int scroll;
+    private int maxScroll;
+    /** Clickable areas from the last frame. */
+    private final List<Hit> hits = new ArrayList<>();
+
+    /** A clickable area: a menu slot, or the Close button (slot = -1). */
+    private record Hit(int x, int y, int w, int h, int slot) {
+    }
 
     public RogueScreen(RogueView view) {
         super(view.title);
@@ -82,61 +103,19 @@ public final class RogueScreen extends Screen {
     }
 
     private int footerTop() {
-        return y0 + h - FOOTER_H - 4;
+        return y0 + h - FOOTER_H - 5;
     }
 
     private int bodyBottom() {
-        return footerTop() - 4;
+        return footerTop() - 5;
     }
 
     private int contentX() {
-        return view.run ? x0 + 6 + PARTY_W + 4 + CENTER_W + 4 : x0 + 6;
+        return view.run ? x0 + 6 + PARTY_W + GAP + CENTER_W + GAP : x0 + 6;
     }
 
     private int contentW() {
         return x0 + w - 6 - contentX();
-    }
-
-    private int columns() {
-        return !view.run && view.content.size() > 7 && contentW() >= 300 ? 2 : 1;
-    }
-
-    private int visibleRows() {
-        return Math.max(1, (bodyBottom() - bodyTop() - 8 + ROW_GAP) / (ROW_H + ROW_GAP));
-    }
-
-    private int maxScroll() {
-        int rows = (view.content.size() + columns() - 1) / columns();
-        return Math.max(0, rows - visibleRows());
-    }
-
-    /** Screen rectangle of a content entry, or null if it's scrolled out of view. */
-    private int[] entryRect(int index) {
-        int cols = columns();
-        int row = index / cols - scroll;
-        if (row < 0 || row >= visibleRows()) {
-            return null;
-        }
-        int innerX = contentX() + 4;
-        int innerW = contentW() - 8 - (maxScroll() > 0 ? 6 : 0);
-        int colW = (innerW - (cols - 1) * 4) / cols;
-        int x = innerX + (index % cols) * (colW + 4);
-        int y = bodyTop() + 4 + row * (ROW_H + ROW_GAP);
-        return new int[]{x, y, colW, ROW_H};
-    }
-
-    private int buttonCount() {
-        return view.actions.size() + 1; // + Close
-    }
-
-    private int[] buttonRect(int index) {
-        int n = buttonCount();
-        int bw = Math.min(70, (w - 12 - (n - 1) * 4) / n);
-        int y = footerTop();
-        if (index == n - 1) {
-            return new int[]{x0 + w - 6 - bw, y, bw, FOOTER_H}; // Close sits on the right
-        }
-        return new int[]{x0 + 6 + index * (bw + 4), y, bw, FOOTER_H};
     }
 
     private int[] memberRect(int index) {
@@ -150,39 +129,48 @@ public final class RogueScreen extends Screen {
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
-        // Frame
+        hits.clear();
+
         context.fill(x0, y0, x0 + w, y0 + h, FRAME_BG);
         context.drawBorder(x0, y0, w, h, FRAME_OUTER);
         context.drawBorder(x0 + 1, y0 + 1, w - 2, h - 2, 0xFF2A2060);
 
         // Header: title tab and badge
-        int titleW = Math.min(textRenderer.getWidth(view.title) + 12, w / 2 + 40);
+        int badgeW = view.badge.getString().isEmpty() ? 0 : textRenderer.getWidth(view.badge) + 12;
+        int titleW = Math.min(textRenderer.getWidth(view.title) + 12, w - 20 - badgeW);
         panel(context, x0 + 6, y0 + 5, titleW, 16, CENTER);
         context.drawText(textRenderer, trim(view.title, titleW - 12), x0 + 12, y0 + 9, TEXT, true);
-        if (!view.badge.getString().isEmpty()) {
-            int badgeW = textRenderer.getWidth(view.badge) + 12;
+        if (badgeW > 0) {
             panel(context, x0 + w - 6 - badgeW, y0 + 5, badgeW, 16, GOLD);
             context.drawText(textRenderer, view.badge, x0 + w - badgeW, y0 + 9, TEXT, true);
         }
         context.fill(x0 + 6, y0 + 25, x0 + w - 6, y0 + 26, FRAME_OUTER);
 
-        ItemStack tooltip = null;
+        Tooltip tooltip = new Tooltip();
         if (view.run) {
-            tooltip = renderParty(context, mouseX, mouseY);
+            renderParty(context, mouseX, mouseY, tooltip);
             renderCenter(context);
         }
-        ItemStack contentTip = renderContent(context, mouseX, mouseY);
-        tooltip = tooltip != null ? tooltip : contentTip;
-        ItemStack footerTip = renderFooter(context, mouseX, mouseY);
-        tooltip = tooltip != null ? tooltip : footerTip;
+        renderContent(context, mouseX, mouseY, tooltip);
+        renderFooter(context, mouseX, mouseY, tooltip);
 
-        if (tooltip != null) {
-            context.drawItemTooltip(textRenderer, tooltip, mouseX, mouseY);
+        if (tooltip.stack != null) {
+            context.drawItemTooltip(textRenderer, tooltip.stack, mouseX, mouseY);
         }
     }
 
-    private ItemStack renderParty(DrawContext context, int mouseX, int mouseY) {
-        ItemStack tooltip = null;
+    /** The first hovered stack wins. */
+    private static final class Tooltip {
+        ItemStack stack;
+
+        void offer(ItemStack candidate) {
+            if (stack == null) {
+                stack = candidate;
+            }
+        }
+    }
+
+    private void renderParty(DrawContext context, int mouseX, int mouseY, Tooltip tooltip) {
         for (int i = 0; i < 6; i++) {
             RogueView.Member member = null;
             boolean partner = false;
@@ -197,10 +185,8 @@ public final class RogueScreen extends Screen {
             if (member == null) {
                 continue;
             }
-            int iconY = r[1] + (r[3] - 16) / 2;
-            context.drawItem(member.icon(), r[0] + 3, iconY);
+            context.drawItem(member.icon(), r[0] + 3, r[1] + (r[3] - 16) / 2);
             context.drawText(textRenderer, "Lv" + member.level(), r[0] + 22, r[1] + 3, 0xFFFFE070, true);
-            // HP bar
             int barX = r[0] + 22;
             int barW = r[2] - 25;
             int barY = r[1] + 13;
@@ -211,16 +197,15 @@ public final class RogueScreen extends Screen {
             if (!member.held().isEmpty()) {
                 drawScaledItem(context, member.held(), r[0] + r[2] - 11, r[1] + r[3] - 10, 0.5F);
             }
-            if (inside(mouseX, mouseY, r)) {
+            if (inside(mouseX, mouseY, r[0], r[1], r[2], r[3])) {
                 context.fill(r[0] + 1, r[1] + 1, r[0] + r[2] - 1, r[1] + r[3] - 1, HOVER);
-                tooltip = member.icon();
+                tooltip.offer(member.icon());
             }
         }
-        return tooltip;
     }
 
     private void renderCenter(DrawContext context) {
-        int x = x0 + 6 + PARTY_W + 4;
+        int x = x0 + 6 + PARTY_W + GAP;
         int top = bodyTop();
         int bottom = bodyBottom();
         tile(context, view.theme, x, top, CENTER_W, bottom - top, 0xD0101626);
@@ -275,7 +260,7 @@ public final class RogueScreen extends Screen {
         }
     }
 
-    private ItemStack renderContent(DrawContext context, int mouseX, int mouseY) {
+    private void renderContent(DrawContext context, int mouseX, int mouseY, Tooltip tooltip) {
         int x = contentX();
         int top = bodyTop();
         int bottom = bodyBottom();
@@ -287,111 +272,305 @@ public final class RogueScreen extends Screen {
         }
         context.drawBorder(x, top, cw, bottom - top, CONTENT);
 
-        scroll = Math.max(0, Math.min(scroll, maxScroll()));
-        ItemStack tooltip = null;
-        for (int i = 0; i < view.content.size(); i++) {
-            int[] r = entryRect(i);
-            if (r == null) {
-                continue;
-            }
-            RogueView.Entry entry = view.content.get(i);
-            boolean hovered = inside(mouseX, mouseY, r);
-            if (entry.clickable()) {
-                context.fill(r[0], r[1], r[0] + r[2], r[1] + r[3], 0xE0202A48);
-                context.drawBorder(r[0], r[1], r[2], r[3], hovered ? 0xFFFFFFFF : 0xFF5A4A9A);
-            } else {
-                context.fill(r[0], r[1], r[0] + r[2], r[1] + r[3], 0x90000000);
-            }
-            if (hovered) {
-                context.fill(r[0] + 1, r[1] + 1, r[0] + r[2] - 1, r[1] + r[3] - 1, HOVER);
-                tooltip = entry.stack();
-            }
-            context.drawItem(entry.stack(), r[0] + 3, r[1] + 3);
-            int textX = r[0] + 23;
-            int textW = r[2] - 26;
-            Text subtitle = firstLore(entry.stack());
-            if (subtitle == null) {
-                context.drawText(textRenderer, trim(entry.stack().getName(), textW), textX, r[1] + 7, TEXT, true);
-            } else {
-                context.drawText(textRenderer, trim(entry.stack().getName(), textW), textX, r[1] + 2, TEXT, true);
-                context.drawText(textRenderer, trim(subtitle, textW), textX, r[1] + 12, MUTED, false);
-            }
+        int y = top + GAP;
+        if (!view.info.isEmpty()) {
+            y = renderInfo(context, x + GAP, y, cw - 2 * GAP, mouseX, mouseY, tooltip) + GAP;
         }
-
-        // Scrollbar
-        int max = maxScroll();
-        if (max > 0) {
-            int trackX = x + cw - 8;
-            int trackTop = top + 4;
-            int trackH = bottom - top - 8;
-            context.fill(trackX, trackTop, trackX + 4, trackTop + trackH, 0xFF1A2038);
-            int thumbH = Math.max(12, trackH * visibleRows() / (visibleRows() + max));
-            int thumbY = trackTop + (trackH - thumbH) * scroll / max;
-            context.fill(trackX, thumbY, trackX + 4, thumbY + thumbH, 0xFF7B5AC8);
+        int ax = x + GAP;
+        int aw = cw - 2 * GAP;
+        int ah = bottom - GAP - y;
+        if (ah <= 0 || view.content.isEmpty()) {
+            maxScroll = 0;
+            return;
         }
-        return tooltip;
+        context.enableScissor(ax, y, ax + aw, y + ah);
+        switch (view.layout) {
+            case CARDS -> renderCards(context, ax, y, aw, ah, mouseX, mouseY, tooltip);
+            case GRID -> renderGrid(context, ax, y, aw, ah, mouseX, mouseY, tooltip);
+            case PAGE -> renderPage(context, ax, y, aw, ah);
+            default -> renderList(context, ax, y, aw, ah, mouseX, mouseY, tooltip);
+        }
+        context.disableScissor();
+        renderScrollbar(context, x + cw - 3, y, ah);
     }
 
-    private ItemStack renderFooter(DrawContext context, int mouseX, int mouseY) {
-        ItemStack tooltip = null;
-        int n = buttonCount();
+    /** Description boxes side by side; returns the bottom edge. */
+    private int renderInfo(DrawContext context, int x, int y, int width, int mouseX, int mouseY, Tooltip tooltip) {
+        int n = Math.min(3, view.info.size());
+        int boxW = (width - (n - 1) * GAP) / n;
+        int maxLines = n == 1 ? 5 : 4;
+        int boxH = 22;
+        List<List<OrderedText>> bodies = new ArrayList<>();
         for (int i = 0; i < n; i++) {
-            int[] r = buttonRect(i);
-            boolean close = i == n - 1;
-            boolean hovered = inside(mouseX, mouseY, r);
-            RogueView.Entry entry = close ? null : view.actions.get(i);
-            boolean clickable = close || entry.clickable();
-            context.fill(r[0], r[1], r[0] + r[2], r[1] + r[3], clickable ? 0xF01C2440 : 0xC0101420);
-            context.drawBorder(r[0], r[1], r[2], r[3], hovered && clickable ? 0xFFFFFFFF : clickable ? 0xFF4A5680 : 0xFF2A3050);
-            if (close) {
-                Text label = Text.literal("Close");
-                context.drawText(textRenderer, label, r[0] + (r[2] - textRenderer.getWidth(label)) / 2, r[1] + 7, TEXT, true);
-                continue;
+            List<OrderedText> lines = wrapLore(view.info.get(i).stack(), boxW - 26);
+            bodies.add(lines);
+            boxH = Math.max(boxH, 16 + Math.min(lines.size(), maxLines) * 9 + 3);
+        }
+        for (int i = 0; i < n; i++) {
+            RogueView.Entry entry = view.info.get(i);
+            int bx = x + i * (boxW + GAP);
+            context.fill(bx, y, bx + boxW, y + boxH, INFO_BG);
+            context.drawBorder(bx, y, boxW, boxH, INFO_BORDER);
+            context.drawItem(entry.stack(), bx + 3, y + 3);
+            context.drawText(textRenderer, trim(entry.stack().getName(), boxW - 26), bx + 23, y + 4, TEXT, true);
+            List<OrderedText> lines = bodies.get(i);
+            for (int l = 0; l < lines.size() && l < maxLines; l++) {
+                context.drawText(textRenderer, lines.get(l), bx + 23, y + 15 + l * 9, MUTED, false);
             }
-            context.drawItem(entry.stack(), r[0] + 3, r[1] + 3);
-            if (r[2] >= 40) {
-                context.drawText(textRenderer, trim(entry.stack().getName(), r[2] - 24), r[0] + 21, r[1] + 7, TEXT, true);
-            }
-            if (hovered) {
-                tooltip = entry.stack();
+            if (lines.size() > maxLines && inside(mouseX, mouseY, bx, y, boxW, boxH)) {
+                tooltip.offer(entry.stack());
             }
         }
-        return tooltip;
+        return y + boxH;
+    }
+
+    private void renderList(DrawContext context, int x, int y, int width, int height, int mouseX, int mouseY, Tooltip tooltip) {
+        int visible = Math.max(1, (height + 2) / (ROW_H + 2));
+        maxScroll = Math.max(0, view.content.size() - visible);
+        scroll = Math.max(0, Math.min(scroll, maxScroll));
+        int rowW = width - (maxScroll > 0 ? 6 : 0);
+        for (int i = scroll; i < view.content.size() && i < scroll + visible; i++) {
+            RogueView.Entry entry = view.content.get(i);
+            int ry = y + (i - scroll) * (ROW_H + 2);
+            boolean hovered = drawBox(context, entry, x, ry, rowW, ROW_H, mouseX, mouseY);
+            context.drawItem(entry.stack(), x + 3, ry + 3);
+            Text subtitle = firstLore(entry.stack());
+            int textW = rowW - 26;
+            if (subtitle == null) {
+                context.drawText(textRenderer, trim(entry.stack().getName(), textW), x + 23, ry + 7, TEXT, true);
+            } else {
+                context.drawText(textRenderer, trim(entry.stack().getName(), textW), x + 23, ry + 2, TEXT, true);
+                context.drawText(textRenderer, trim(subtitle, textW), x + 23, ry + 12, MUTED, false);
+            }
+            if (hovered) {
+                tooltip.offer(entry.stack());
+            }
+        }
+    }
+
+    /** A few big cards, centered: up to 4 in a row (5 or more wrap into rows of 3-5). */
+    private void renderCards(DrawContext context, int x, int y, int width, int height, int mouseX, int mouseY, Tooltip tooltip) {
+        maxScroll = 0;
+        int n = view.content.size();
+        int perRow = n <= 4 ? n : n <= 6 ? 3 : n <= 8 ? 4 : 5;
+        int rows = (n + perRow - 1) / perRow;
+        int cardW = Math.min(150, (width - (perRow - 1) * 6) / perRow);
+        int cardH = Math.min(120, (height - (rows - 1) * 6) / rows);
+        if (cardH < 40) {
+            renderList(context, x, y, width, height, mouseX, mouseY, tooltip);
+            return;
+        }
+        int blockH = rows * cardH + (rows - 1) * 6;
+        int startY = y + Math.max(0, (height - blockH) / 2);
+        boolean bigIcon = cardH >= 80;
+        for (int i = 0; i < n; i++) {
+            int row = i / perRow;
+            int inRow = Math.min(perRow, n - row * perRow);
+            int rowW = inRow * cardW + (inRow - 1) * 6;
+            int cx = x + (width - rowW) / 2 + (i % perRow) * (cardW + 6);
+            int cy = startY + row * (cardH + 6);
+            RogueView.Entry entry = view.content.get(i);
+            boolean hovered = drawBox(context, entry, cx, cy, cardW, cardH, mouseX, mouseY);
+
+            int ty;
+            if (bigIcon) {
+                drawScaledItem(context, entry.stack(), cx + (cardW - 32) / 2F, cy + 6, 2F);
+                ty = cy + 42;
+            } else {
+                context.drawItem(entry.stack(), cx + (cardW - 16) / 2, cy + 4);
+                ty = cy + 23;
+            }
+            List<OrderedText> name = textRenderer.wrapLines(entry.stack().getName(), cardW - 8);
+            for (int l = 0; l < name.size() && l < 2; l++) {
+                OrderedText line = name.get(l);
+                context.drawText(textRenderer, line, cx + (cardW - textRenderer.getWidth(line)) / 2, ty, TEXT, true);
+                ty += 10;
+            }
+            ty += 2;
+            List<OrderedText> lore = wrapLore(entry.stack(), cardW - 10);
+            boolean truncated = name.size() > 2;
+            for (OrderedText line : lore) {
+                if (ty + 9 > cy + cardH - 2) {
+                    truncated = true;
+                    break;
+                }
+                context.drawText(textRenderer, line, cx + (cardW - textRenderer.getWidth(line)) / 2, ty, MUTED, false);
+                ty += 9;
+            }
+            if (hovered && truncated) {
+                tooltip.offer(entry.stack());
+            }
+        }
+    }
+
+    /** Icon tiles at their chest positions (9 wide), details on hover. */
+    private void renderGrid(DrawContext context, int x, int y, int width, int height, int mouseX, int mouseY, Tooltip tooltip) {
+        maxScroll = 0;
+        int minRow = Integer.MAX_VALUE;
+        int maxRow = 0;
+        for (RogueView.Entry entry : view.content) {
+            minRow = Math.min(minRow, entry.slot() / 9);
+            maxRow = Math.max(maxRow, entry.slot() / 9);
+        }
+        int rows = maxRow - minRow + 1;
+        int tile = Math.max(18, Math.min(40, Math.min(width / 9, height / rows)));
+        int startX = x + (width - tile * 9) / 2;
+        int startY = y + Math.max(0, (height - tile * rows) / 2);
+        float scale = tile >= 38 ? 2F : tile >= 28 ? 1.5F : 1F;
+        int icon = Math.round(16 * scale);
+        for (RogueView.Entry entry : view.content) {
+            int tx = startX + (entry.slot() % 9) * tile;
+            int ty = startY + (entry.slot() / 9 - minRow) * tile;
+            boolean hovered = drawBox(context, entry, tx + 1, ty + 1, tile - 2, tile - 2, mouseX, mouseY);
+            MatrixStack matrices = context.getMatrices();
+            matrices.push();
+            matrices.translate(tx + (tile - icon) / 2F, ty + (tile - icon) / 2F, 0);
+            matrices.scale(scale, scale, 1F);
+            context.drawItem(entry.stack(), 0, 0);
+            context.drawItemInSlot(textRenderer, entry.stack(), 0, 0);
+            matrices.pop();
+            if (hovered) {
+                tooltip.offer(entry.stack());
+            }
+        }
+    }
+
+    /** Text sections: icon and heading, then the full lore. Scrolls. */
+    private void renderPage(DrawContext context, int x, int y, int width, int height) {
+        int total = 0;
+        List<List<OrderedText>> bodies = new ArrayList<>();
+        for (RogueView.Entry entry : view.content) {
+            List<OrderedText> lines = wrapLore(entry.stack(), width - 32);
+            bodies.add(lines);
+            total += 18 + lines.size() * 10 + 8;
+        }
+        maxScroll = Math.max(0, (total - height + PAGE_STEP - 1) / PAGE_STEP);
+        scroll = Math.max(0, Math.min(scroll, maxScroll));
+        int cy = y - scroll * PAGE_STEP;
+        for (int i = 0; i < view.content.size(); i++) {
+            RogueView.Entry entry = view.content.get(i);
+            List<OrderedText> lines = bodies.get(i);
+            int sectionH = 18 + lines.size() * 10;
+            context.fill(x, cy, x + width - 6, cy + sectionH + 2, INFO_BG);
+            context.drawItem(entry.stack(), x + 3, cy + 1);
+            context.drawText(textRenderer, trim(entry.stack().getName(), width - 32), x + 23, cy + 5, TEXT, true);
+            for (int l = 0; l < lines.size(); l++) {
+                context.drawText(textRenderer, lines.get(l), x + 23, cy + 18 + l * 10, MUTED, false);
+            }
+            cy += sectionH + 8;
+        }
+    }
+
+    private void renderScrollbar(DrawContext context, int x, int top, int height) {
+        if (maxScroll <= 0) {
+            return;
+        }
+        context.fill(x - 4, top, x, top + height, 0xFF1A2038);
+        int thumbH = Math.max(12, height / (maxScroll + 1));
+        int thumbY = top + (height - thumbH) * scroll / maxScroll;
+        context.fill(x - 4, thumbY, x, thumbY + thumbH, 0xFF7B5AC8);
+    }
+
+    /** Close in the bottom-left, Back in the bottom-right, footer buttons centered between. */
+    private void renderFooter(DrawContext context, int mouseX, int mouseY, Tooltip tooltip) {
+        int y = footerTop();
+        int left = x0 + 6;
+        int right = x0 + w - 6;
+
+        Text close = Text.literal("Close");
+        int closeW = textRenderer.getWidth(close) + 20;
+        textButton(context, close, left, y, closeW, mouseX, mouseY, 0xFF6A4A5A);
+        hits.add(new Hit(left, y, closeW, FOOTER_H, -1));
+        left += closeW + GAP;
+
+        if (!view.back.isEmpty()) {
+            RogueView.Entry back = view.back.get(0);
+            Text label = Text.literal("◀ ").append(back.stack().getName());
+            int backW = textRenderer.getWidth(label) + 16;
+            right -= backW;
+            textButton(context, label, right, y, backW, mouseX, mouseY, 0xFF4A6A9A);
+            hits.add(new Hit(right, y, backW, FOOTER_H, back.slot()));
+            right -= GAP;
+        }
+
+        int n = view.actions.size();
+        if (n == 0) {
+            return;
+        }
+        int space = right - left;
+        int labeled = 0;
+        for (RogueView.Entry entry : view.actions) {
+            labeled += Math.min(110, textRenderer.getWidth(entry.stack().getName()) + 26);
+        }
+        labeled += (n - 1) * GAP;
+        boolean withLabels = labeled <= space;
+        int total = withLabels ? labeled : n * FOOTER_H + (n - 1) * GAP;
+        int bx = left + Math.max(0, (space - total) / 2);
+        for (RogueView.Entry entry : view.actions) {
+            int bw = withLabels ? Math.min(110, textRenderer.getWidth(entry.stack().getName()) + 26) : FOOTER_H;
+            boolean hovered = inside(mouseX, mouseY, bx, y, bw, FOOTER_H);
+            context.fill(bx, y, bx + bw, y + FOOTER_H, entry.clickable() ? BUTTON_BG : 0xC0101420);
+            context.drawBorder(bx, y, bw, FOOTER_H, hovered && entry.clickable() ? 0xFFFFFFFF : entry.clickable() ? BUTTON_BORDER : 0xFF2A3050);
+            context.drawItem(entry.stack(), bx + 3, y + 3);
+            if (withLabels) {
+                context.drawText(textRenderer, trim(entry.stack().getName(), bw - 24), bx + 21, y + 7, TEXT, true);
+            }
+            if (entry.clickable()) {
+                hits.add(new Hit(bx, y, bw, FOOTER_H, entry.slot()));
+            }
+            if (hovered) {
+                tooltip.offer(entry.stack());
+            }
+            bx += bw + GAP;
+        }
+    }
+
+    private void textButton(DrawContext context, Text label, int x, int y, int width, int mouseX, int mouseY, int border) {
+        boolean hovered = inside(mouseX, mouseY, x, y, width, FOOTER_H);
+        context.fill(x, y, x + width, y + FOOTER_H, BUTTON_BG);
+        context.drawBorder(x, y, width, FOOTER_H, hovered ? 0xFFFFFFFF : border);
+        context.drawText(textRenderer, label, x + (width - textRenderer.getWidth(label)) / 2, y + 7, TEXT, true);
+    }
+
+    /** Background and border for an entry; registers clickable ones. Returns whether it's hovered. */
+    private boolean drawBox(DrawContext context, RogueView.Entry entry, int x, int y, int width, int height, int mouseX, int mouseY) {
+        boolean hovered = inside(mouseX, mouseY, x, y, width, height);
+        if (entry.clickable()) {
+            context.fill(x, y, x + width, y + height, CARD_BG);
+            context.drawBorder(x, y, width, height, hovered ? 0xFFFFFFFF : CARD_BORDER);
+            hits.add(new Hit(x, y, width, height, entry.slot()));
+        } else {
+            context.fill(x, y, x + width, y + height, INFO_BG);
+        }
+        if (hovered) {
+            context.fill(x + 1, y + 1, x + width - 1, y + height - 1, HOVER);
+        }
+        return hovered;
     }
 
     // ------------------------------------------------------------------ input
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button != 0 && button != 1) {
-            return super.mouseClicked(mouseX, mouseY, button);
-        }
-        for (int i = 0; i < view.content.size(); i++) {
-            int[] r = entryRect(i);
-            if (r != null && inside(mouseX, mouseY, r) && view.content.get(i).clickable()) {
-                click(view.content.get(i).slot(), button);
-                return true;
+        if (button == 0 || button == 1) {
+            for (Hit hit : hits) {
+                if (inside(mouseX, mouseY, hit.x(), hit.y(), hit.w(), hit.h())) {
+                    playClick();
+                    if (hit.slot() < 0) {
+                        close();
+                    } else {
+                        send(hit.slot(), button);
+                    }
+                    return true;
+                }
             }
-        }
-        int n = buttonCount();
-        for (int i = 0; i < n; i++) {
-            if (!inside(mouseX, mouseY, buttonRect(i))) {
-                continue;
-            }
-            if (i == n - 1) {
-                playClick();
-                close();
-            } else if (view.actions.get(i).clickable()) {
-                click(view.actions.get(i).slot(), button);
-            }
-            return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        scroll = Math.max(0, Math.min(maxScroll(), scroll - (int) Math.signum(verticalAmount)));
+        scroll = Math.max(0, Math.min(maxScroll, scroll - (int) Math.signum(verticalAmount)));
         return true;
     }
 
@@ -415,11 +594,6 @@ public final class RogueScreen extends Screen {
             }
         }
         super.removed();
-    }
-
-    private void click(int slot, int button) {
-        playClick();
-        send(slot, button);
     }
 
     private void send(int slot, int button) {
@@ -458,10 +632,10 @@ public final class RogueScreen extends Screen {
         }
     }
 
-    private void drawScaledItem(DrawContext context, ItemStack stack, int x, int y, float scale) {
+    private void drawScaledItem(DrawContext context, ItemStack stack, float x, float y, float scale) {
         MatrixStack matrices = context.getMatrices();
         matrices.push();
-        matrices.translate(x, y, 200);
+        matrices.translate(x, y, 0);
         matrices.scale(scale, scale, 1F);
         context.drawItem(stack, 0, 0);
         matrices.pop();
@@ -475,13 +649,27 @@ public final class RogueScreen extends Screen {
         return Language.getInstance().reorder(StringVisitable.concat(cut, StringVisitable.plain("…")));
     }
 
+    /** All non-blank lore lines, wrapped to a width. */
+    private List<OrderedText> wrapLore(ItemStack stack, int width) {
+        List<OrderedText> lines = new ArrayList<>();
+        LoreComponent lore = stack.get(DataComponentTypes.LORE);
+        if (lore == null) {
+            return lines;
+        }
+        for (Text line : lore.lines()) {
+            if (!line.getString().isBlank()) {
+                lines.addAll(textRenderer.wrapLines(line, Math.max(20, width)));
+            }
+        }
+        return lines;
+    }
+
     private static Text firstLore(ItemStack stack) {
         LoreComponent lore = stack.get(DataComponentTypes.LORE);
         if (lore == null) {
             return null;
         }
-        List<Text> lines = lore.lines();
-        for (Text line : lines) {
+        for (Text line : lore.lines()) {
             if (!line.getString().isBlank()) {
                 return line;
             }
@@ -489,7 +677,7 @@ public final class RogueScreen extends Screen {
         return null;
     }
 
-    private static boolean inside(double mouseX, double mouseY, int[] r) {
-        return mouseX >= r[0] && mouseX < r[0] + r[2] && mouseY >= r[1] && mouseY < r[1] + r[3];
+    private static boolean inside(double mouseX, double mouseY, int x, int y, int width, int height) {
+        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
     }
 }

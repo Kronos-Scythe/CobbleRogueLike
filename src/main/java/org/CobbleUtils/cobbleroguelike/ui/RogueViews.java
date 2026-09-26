@@ -27,7 +27,7 @@ final class RogueViews {
     static RogueView build(Menu menu, ServerPlayerEntity player, int id) {
         RogueView view = new RogueView();
         view.id = id;
-        view.title = menu.title();
+        view.title = menu.viewTitle();
         view.theme = menu.themeBlock();
         view.themedContent = menu.themedContent();
 
@@ -39,12 +39,14 @@ final class RogueViews {
                 continue;
             }
             RogueView.Entry entry = new RogueView.Entry(slot, stack, menu.action(slot) != null);
-            if (menu.navRowIndex() >= 0 && slot / 9 == menu.navRowIndex()) {
-                view.actions.add(entry);
-            } else {
-                view.content.add(entry);
+            switch (menu.roleOf(slot)) {
+                case CONTENT -> view.content.add(entry);
+                case INFO -> view.info.add(entry);
+                case FOOTER -> view.actions.add(entry);
+                case BACK -> view.back.add(entry);
             }
         }
+        view.layout = menu.layoutType().ordinal();
 
         RunState state = RunManager.isInRun(player) ? RunManager.get().state(player) : null;
         if (state == null) {
@@ -69,7 +71,6 @@ final class RogueViews {
             view.stats.add(Text.literal("Elite Four: " + state.eliteWins + "/" + config.eliteCount).formatted(Formatting.LIGHT_PURPLE));
         }
         view.stats.add(Text.literal("Level cap: " + Scaling.levelCap(state.badges)).formatted(Formatting.GREEN));
-        view.stats.add(Text.literal("Coins: " + state.money).formatted(Formatting.GOLD));
         view.stats.add(Text.literal("Biome: " + Biomes.get(state.biome).name).formatted(Formatting.WHITE));
         view.stats.add(state.isCoop()
                 ? Text.literal("Co-op: " + RunManager.get().partnerName(state, player.getUuid())).formatted(Formatting.AQUA)
