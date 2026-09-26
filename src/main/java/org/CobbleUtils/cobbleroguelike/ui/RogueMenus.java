@@ -1,7 +1,10 @@
 package org.CobbleUtils.cobbleroguelike.ui;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.ProfileComponent;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -54,7 +57,30 @@ public final class RogueMenus {
             menu.button(22, Menu.stack("minecraft:barrier", Text.literal("End saved run").formatted(Formatting.RED), List.of(
                     Text.literal("Asks for confirmation."))),
                     p -> hub(p, true));
+        } else if (RunManager.get().inLobby(player)) {
+            menu.button(11, Menu.stack("cobblemon:poke_ball", Text.literal("Pick your partner").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
+                    Text.literal("You're in a co-op lobby."),
+                    Text.literal("The run starts once you both picked."))),
+                    p -> partnerPicker(p, 0));
+            menu.icon(13, guide());
+            menu.button(15, Menu.stack("minecraft:oak_door", Text.literal("Leave lobby").formatted(Formatting.RED), List.of()),
+                    p -> {
+                        RunManager.get().leaveLobby(p);
+                        hub(p, false);
+                    });
         } else if (!RunManager.isInRun(player)) {
+            String inviter = RunManager.get().pendingInviteFrom(player);
+            if (inviter != null) {
+                menu.button(22, Menu.stack("minecraft:player_head", Text.literal("Join " + inviter + "'s co-op run").formatted(Formatting.AQUA, Formatting.BOLD), List.of(
+                        Text.literal("You were invited to a co-op run!"),
+                        Text.literal("Click to accept."))),
+                        p -> RunManager.get().accept(p));
+            } else {
+                menu.button(22, Menu.stack("minecraft:player_head", Text.literal("Co-op run").formatted(Formatting.AQUA), List.of(
+                        Text.literal("Invite a friend: every battle is a 2 vs 2,"),
+                        Text.literal("each of you with up to " + Math.max(1, Math.min(6, RogueConfig.get().coopPartyLimit)) + " Pokémon."))),
+                        RogueMenus::invite);
+            }
             menu.button(11, Menu.stack("cobblemon:poke_ball", Text.literal("Start a run").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
                     Text.literal("Pick one of your own Pokémon as your"),
                     Text.literal("only partner and build a team as you go."),
@@ -70,8 +96,9 @@ public final class RogueMenus {
         } else if (confirmAbandon) {
             menu.button(11, Menu.stack("minecraft:lime_concrete", Text.literal("Keep playing").formatted(Formatting.GREEN), List.of()),
                     p -> RunManager.get().openCurrent(p));
+            RunState ending = RunManager.get().state(player);
             menu.button(15, Menu.stack("minecraft:red_concrete", Text.literal("Yes, end my run").formatted(Formatting.RED), List.of(
-                    Text.literal("Your run Pokémon will be lost."),
+                    Text.literal(ending != null && ending.isCoop() ? "Ends the run for both of you." : "Your run Pokémon will be lost."),
                     Text.literal("You still get Rogue Tokens for your progress."))),
                     p -> RunManager.get().end(p, "You ended your run."));
         } else {
@@ -225,7 +252,7 @@ public final class RogueMenus {
                         p -> RunManager.get().chooseNode(p, index));
             }
         }
-        addControls(menu, state);
+        addControls(menu, state, player.getUuid());
         menu.open(player);
     }
 
@@ -272,9 +299,31 @@ public final class RogueMenus {
                     Text.literal("Skip this encounter and move on."))),
                     p -> RunManager.get().skipLegendary(p));
         }
-        menu.button(22, Menu.stack("minecraft:lime_concrete", Text.literal("Fight!").formatted(Formatting.GREEN, Formatting.BOLD), List.of()),
-                p -> RunManager.get().startBattle(p));
-        addControls(menu, state);
+        if (state.isCoop()) {
+            boolean meReady = state.ready.contains(player.getUuid());
+            UUID other = state.other(player.getUuid());
+            boolean otherReady = other != null && state.ready.contains(other);
+            String partner = RunManager.get().partnerName(state, player.getUuid());
+            menu.button(22, Menu.stack(meReady ? "minecraft:lime_concrete" : "minecraft:yellow_concrete",
+                    Text.literal(meReady ? "Ready! (" + (otherReady ? 2 : 1) + "/2)" : "Ready up (" + (otherReady ? 1 : 0) + "/2)")
+                            .formatted(Formatting.GREEN, Formatting.BOLD), List.of(
+                            Text.literal("You: " + (meReady ? "ready" : "not ready")).formatted(meReady ? Formatting.GREEN : Formatting.GRAY),
+                            Text.literal(partner + ": " + (otherReady ? "ready" : "not ready")).formatted(otherReady ? Formatting.GREEN : Formatting.GRAY),
+                            Text.literal("The battle starts when you're both ready").formatted(Formatting.DARK_GRAY),
+                            Text.literal("and standing together.").formatted(Formatting.DARK_GRAY))),
+                    p -> RunManager.get().startBattle(p));
+            if (!state.battleName2.isEmpty()) {
+                menu.icon(15, Menu.stack(state.battleKind == RunState.NodeType.LEGENDARY && !state.battleTeam2.isEmpty()
+                                ? speciesIcon(state.battleTeam2.get(0)) : Menu.stack("minecraft:iron_sword", Text.literal(""), List.of()),
+                        Text.literal(state.battleName2).formatted(Formatting.GOLD), List.of(
+                                Text.literal("Second opponent: " + state.battleTeam2.size() + " Pokémon"),
+                                Text.literal("Co-op battles are 2 vs 2.").formatted(Formatting.AQUA))));
+            }
+        } else {
+            menu.button(22, Menu.stack("minecraft:lime_concrete", Text.literal("Fight!").formatted(Formatting.GREEN, Formatting.BOLD), List.of()),
+                    p -> RunManager.get().startBattle(p));
+        }
+        addControls(menu, state, player.getUuid());
         menu.open(player);
     }
 
@@ -297,22 +346,38 @@ public final class RogueMenus {
 
     public static void encounter(ServerPlayerEntity player, RunState state) {
         Menu menu = new Menu(Text.literal("Wild Pokémon appeared!"), RUN_ROWS);
+        Integer myPick = state.coopPicks.get(player.getUuid());
+        UUID otherId = state.other(player.getUuid());
+        Integer otherPick = otherId == null ? null : state.coopPicks.get(otherId);
         for (int i = 0; i < state.encounterOptions.size() && i < CHOICE_SLOTS.length; i++) {
             int index = i;
             String properties = state.encounterOptions.get(i);
-            menu.button(CHOICE_SLOTS[i], Menu.stack(speciesIcon(properties), Text.literal(describeProperties(properties)).formatted(Formatting.AQUA), List.of(
-                    Text.literal("Click to add to your team."))),
+            List<Text> lore = new ArrayList<>();
+            if (myPick != null && myPick == index) {
+                lore.add(Text.literal("Your pick!").formatted(Formatting.GREEN));
+            } else if (otherPick != null && otherPick == index) {
+                lore.add(Text.literal("Taken by " + RunManager.get().partnerName(state, player.getUuid())).formatted(Formatting.RED));
+            } else if (myPick != null) {
+                lore.add(Text.literal("Waiting for " + RunManager.get().partnerName(state, player.getUuid()) + "...").formatted(Formatting.GRAY));
+            } else {
+                lore.add(Text.literal("Click to add to your team."));
+            }
+            if (state.isCoop()) {
+                lore.add(Text.literal("Each player takes a different one (max " + RunManager.partyLimit(state) + " each).").formatted(Formatting.DARK_GRAY));
+            }
+            menu.button(CHOICE_SLOTS[i], Menu.stack(speciesIcon(properties), Text.literal(describeProperties(properties)).formatted(Formatting.AQUA), lore),
                     p -> RunManager.get().chooseEncounter(p, index));
         }
         menu.button(22, Menu.stack("minecraft:oak_door", Text.literal("Skip").formatted(Formatting.GRAY), List.of()),
                 p -> RunManager.get().chooseEncounter(p, -1));
-        addControls(menu, state);
+        addControls(menu, state, player.getUuid());
         menu.open(player);
     }
 
-    public static void release(ServerPlayerEntity player, RunState state) {
+    public static void release(ServerPlayerEntity player, RunState state, String pending) {
         Menu menu = new Menu(Text.literal("Party full - release one?"), RUN_ROWS);
-        menu.icon(4, Menu.stack(speciesIcon(state.pendingEncounter), Text.literal("New: " + describeProperties(state.pendingEncounter)).formatted(Formatting.AQUA), List.of()));
+        menu.icon(4, Menu.stack(speciesIcon(pending), Text.literal("New: " + describeProperties(pending)).formatted(Formatting.AQUA), List.of(
+                Text.literal("Party limit: " + RunManager.partyLimit(state)))));
         List<Pokemon> party = CobblemonBridge.partyMembers(player);
         for (int i = 0; i < party.size(); i++) {
             int index = i;
@@ -323,7 +388,7 @@ public final class RogueMenus {
         }
         menu.button(22, Menu.stack("minecraft:oak_door", Text.literal("Keep my party").formatted(Formatting.GRAY), List.of()),
                 p -> RunManager.get().releaseForPending(p, -1));
-        addControls(menu, state);
+        addControls(menu, state, player.getUuid());
         menu.open(player);
     }
 
@@ -334,7 +399,7 @@ public final class RogueMenus {
      * The nav bar on every run screen (bottom row): run info, then Shop, Bag, Move Tutor and the
      * Rogue Shop, a guide, and End run. The rows above hold the screen's own content.
      */
-    private static void addControls(Menu menu, RunState state) {
+    private static void addControls(Menu menu, RunState state, UUID viewer) {
         RogueConfig config = RogueConfig.get();
         int base = NAV_ROW * 9;
         menu.fillRow(NAV_ROW, "minecraft:black_stained_glass_pane");
@@ -346,6 +411,9 @@ public final class RogueMenus {
                 ? "  Elite Four: " + state.eliteWins + "/" + config.eliteCount : "")));
         info.add(Text.literal("Level cap: " + Scaling.levelCap(state.badges)));
         info.add(Text.literal("Coins: " + state.money).formatted(Formatting.GOLD));
+        if (state.isCoop()) {
+            info.add(Text.literal("Co-op with " + RunManager.get().partnerName(state, viewer)).formatted(Formatting.AQUA));
+        }
         if (!state.modifiers.isEmpty()) {
             info.add(Text.literal("Modifiers: " + String.join(", ", state.modifiers.stream()
                     .map(id -> Modifiers.ALL.stream().filter(m -> m.id().equals(id)).map(Modifiers.Info::name).findFirst().orElse(id))
@@ -365,13 +433,55 @@ public final class RogueMenus {
                 Text.literal("Use items, manage held items."))), p -> ShopMenus.bag(p, 0));
         menu.button(base + 4, Menu.stack("minecraft:enchanted_book", Text.literal("Move Tutor").formatted(Formatting.LIGHT_PURPLE), List.of(
                 Text.literal("Teach TM, tutor and egg moves."))), TutorMenus::pickPokemon);
-        menu.button(base + 5, Menu.stack("minecraft:ender_chest", Text.literal("Save & leave").formatted(Formatting.YELLOW), List.of(
-                Text.literal("Put the run away and get your real"),
-                Text.literal("party back. Continue any time from /rogue."))),
-                p -> RunManager.get().saveAndLeave(p));
+        if (state.isCoop()) {
+            menu.icon(base + 5, Menu.stack("minecraft:player_head", Text.literal("Co-op with " + RunManager.get().partnerName(state, viewer)).formatted(Formatting.AQUA), List.of(
+                    Text.literal("Party limit: " + RunManager.partyLimit(state) + " each"),
+                    Text.literal("Log off any time; the run waits for you."),
+                    Text.literal("Save & leave isn't available in co-op.").formatted(Formatting.DARK_GRAY))));
+        } else {
+            menu.button(base + 5, Menu.stack("minecraft:ender_chest", Text.literal("Save & leave").formatted(Formatting.YELLOW), List.of(
+                    Text.literal("Put the run away and get your real"),
+                    Text.literal("party back. Continue any time from /rogue."))),
+                    p -> RunManager.get().saveAndLeave(p));
+        }
         menu.icon(base + 6, guide());
         menu.button(base + 8, Menu.stack("minecraft:barrier", Text.literal("End run").formatted(Formatting.RED), List.of(
                 Text.literal("Asks for confirmation."))), p -> hub(p, true));
+    }
+
+    /** Pick an online player to invite to a co-op run. */
+    public static void invite(ServerPlayerEntity player) {
+        Menu menu = new Menu(Text.literal("Invite a friend"), 6);
+        int slot = 0;
+        for (ServerPlayerEntity other : player.getServer().getPlayerManager().getPlayerList()) {
+            if (other == player || slot >= 45) {
+                continue;
+            }
+            boolean busy = RunManager.isInRun(other) || RunManager.get().inLobby(other);
+            ItemStack head = new ItemStack(Items.PLAYER_HEAD);
+            head.set(DataComponentTypes.PROFILE, new ProfileComponent(other.getGameProfile()));
+            menu.button(slot++, Menu.stack(head, Text.literal(other.getName().getString()).formatted(busy ? Formatting.GRAY : Formatting.AQUA), List.of(
+                    busy ? Text.literal("Already in a run").formatted(Formatting.RED) : Text.literal("Click to invite").formatted(Formatting.YELLOW))),
+                    p -> {
+                        p.closeHandledScreen();
+                        RunManager.get().invite(p, other);
+                    });
+        }
+        if (slot == 0) {
+            menu.icon(22, Menu.stack("minecraft:barrier", Text.literal("Nobody else is online").formatted(Formatting.RED), List.of()));
+        }
+        menu.icon(48, Menu.stack("minecraft:book", Text.literal("Co-op runs").formatted(Formatting.WHITE), List.of(
+                Text.literal("Every battle is a 2 vs 2 against two trainers."),
+                Text.literal("You both press Ready to start a fight."),
+                Text.literal("Routes: each of you takes a different Pokémon."),
+                Text.literal("Coins, floors and badges are shared."),
+                Text.literal("Or use /rogue invite <player>.").formatted(Formatting.DARK_GRAY))));
+        menu.button(49, Menu.stack("minecraft:oak_door", Text.literal("Back"), List.of()), p -> hub(p, false));
+        menu.button(50, Menu.stack("minecraft:netherite_sword", Text.literal("Run modifiers").formatted(Formatting.GOLD), List.of(
+                Text.literal("As the host, your modifiers apply"),
+                Text.literal("to the co-op run. Set them, then come"),
+                Text.literal("back here to invite."))), RogueMenus::setup);
+        menu.open(player);
     }
 
     /** A short how-to-play book shown on the hub and in the nav bar. */

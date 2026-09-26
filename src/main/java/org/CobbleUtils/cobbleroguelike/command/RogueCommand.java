@@ -17,6 +17,7 @@ import static net.minecraft.server.command.CommandManager.literal;
 
 /**
  * {@code /rogue} opens the menu. {@code /rogue shop} spends Rogue Tokens on real items.
+ * Co-op: {@code /rogue invite <player>}, {@code /rogue accept|decline}, {@code /rogue ready}.
  * {@code /rogue tutor} opens the run's Move Tutor. {@code /rogue save} saves & leaves the run (continue from {@code /rogue}). {@code /rogue end} ends the run. {@code /rogue endbattle} force-stops
  * the current battle and ends the run. {@code /rogue clean} force-cleans leftover run data and gives
  * back the saved party.
@@ -50,6 +51,22 @@ public final class RogueCommand {
                         return 0;
                     }
                     RewardMenus.shop(player);
+                    return 1;
+                }))
+                .then(literal("invite").then(argument("player", EntityArgumentType.player()).executes(ctx -> {
+                    RunManager.get().invite(ctx.getSource().getPlayerOrThrow(), EntityArgumentType.getPlayer(ctx, "player"));
+                    return 1;
+                })))
+                .then(literal("accept").executes(ctx -> {
+                    RunManager.get().accept(ctx.getSource().getPlayerOrThrow());
+                    return 1;
+                }))
+                .then(literal("decline").executes(ctx -> {
+                    RunManager.get().decline(ctx.getSource().getPlayerOrThrow());
+                    return 1;
+                }))
+                .then(literal("ready").executes(ctx -> {
+                    RunManager.get().startBattle(ctx.getSource().getPlayerOrThrow());
                     return 1;
                 }))
                 .then(literal("save").executes(ctx -> {

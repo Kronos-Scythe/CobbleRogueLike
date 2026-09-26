@@ -350,6 +350,15 @@ public final class RogueConfig {
     /** ...and Mega Evolution (when a team member can) from this many badges on. */
     public int bossMegaFromBadge = 3;
 
+    // ---------------------------------------------------------------- co-op
+
+    /** Party size per player in co-op runs (6 for solo). */
+    public int coopPartyLimit = 3;
+    /** Co-op players must be this close (same dimension) to start a battle together. */
+    public int coopMaxDistance = 48;
+    /** Seconds an invite stays valid. */
+    public int coopInviteSeconds = 120;
+
     // ---------------------------------------------------------------- move tutor
 
     /** Coins to teach a TM/tutor/egg move. Level-up moves the Pokémon already qualifies for are free. */

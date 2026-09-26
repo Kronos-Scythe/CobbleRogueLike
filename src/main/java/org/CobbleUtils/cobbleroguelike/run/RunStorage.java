@@ -57,12 +57,23 @@ public final class RunStorage {
         return Files.exists(runFile(id));
     }
 
+    /** Reads a run. A co-op partner's file only links to the host's, which is read instead. */
     public RunState readRun(UUID id) throws IOException {
-        return RunState.fromNbt(read(runFile(id)));
+        NbtCompound tag = read(runFile(id));
+        if (tag.containsUuid("link")) {
+            tag = read(runFile(tag.getUuid("link")));
+        }
+        return RunState.fromNbt(tag);
     }
 
+    /** Writes the run under its owner, plus a link file for a co-op partner. */
     public void writeRun(RunState state) throws IOException {
         write(runFile(state.playerId), state.toNbt());
+        if (state.partnerId != null) {
+            NbtCompound link = new NbtCompound();
+            link.putUuid("link", state.playerId);
+            write(runFile(state.partnerId), link);
+        }
     }
 
     public void deleteRun(UUID id) throws IOException {

@@ -6,6 +6,8 @@ import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -20,7 +22,16 @@ public final class RunState {
 
     public enum NodeType { ROUTE, REST, TRAINER, GYM, ELITE, CHAMPION, LEGENDARY }
 
+    /** The run's owner (the host in co-op). The run file is stored under this id. */
     public final UUID playerId;
+    /** Co-op partner, or null for a solo run. The partner's run file just links to the host's. */
+    public UUID partnerId = null;
+    /** Co-op route picks: player to option index (-1 = skipped). */
+    public Map<UUID, Integer> coopPicks = new HashMap<>();
+    /** Co-op: Pokémon waiting for a party slot, per player (their release screen). */
+    public Map<UUID, String> coopPending = new HashMap<>();
+    /** Co-op: players who pressed Ready for the upcoming battle (not saved). */
+    public final Set<UUID> ready = new HashSet<>();
     public final long seed;
     public Phase phase = Phase.CHOOSE_NODE;
     public int floor = 0;
@@ -58,6 +69,9 @@ public final class RunState {
     /** Gym type, e.g. {@code "fire"}; empty for other battles. */
     public String battleType = "";
     public List<String> battleTeam = new ArrayList<>();
+    /** Co-op: the second opponent (partner trainer, or the legendary's companion). */
+    public String battleName2 = "";
+    public List<String> battleTeam2 = new ArrayList<>();
     public int battleSkill = 0;
     public boolean battleDoubles = false;
     /** Gimmick the boss will use ("mega", "tera" or empty; Mega Showdown only). */
@@ -66,6 +80,23 @@ public final class RunState {
     public RunState(UUID playerId, long seed) {
         this.playerId = playerId;
         this.seed = seed;
+    }
+
+    public boolean isCoop() {
+        return partnerId != null;
+    }
+
+    /** Everyone in the run: the owner, plus the partner in co-op. */
+    public List<UUID> members() {
+        return partnerId == null ? List.of(playerId) : List.of(playerId, partnerId);
+    }
+
+    /** The other co-op player, or null. */
+    public UUID other(UUID id) {
+        if (partnerId == null) {
+            return null;
+        }
+        return id.equals(playerId) ? partnerId : playerId;
     }
 
     public int bagCount(String itemId) {
@@ -95,6 +126,8 @@ public final class RunState {
         battleName = "";
         battleType = "";
         battleTeam = new ArrayList<>();
+        battleName2 = "";
+        battleTeam2 = new ArrayList<>();
         battleSkill = 0;
         battleDoubles = false;
         battleGimmick = "";
@@ -129,6 +162,17 @@ public final class RunState {
         tag.putString("battleName", battleName);
         tag.putString("battleType", battleType);
         tag.put("battleTeam", writeStrings(battleTeam));
+        tag.putString("battleName2", battleName2);
+        tag.put("battleTeam2", writeStrings(battleTeam2));
+        if (partnerId != null) {
+            tag.putUuid("partner", partnerId);
+        }
+        NbtCompound picks = new NbtCompound();
+        coopPicks.forEach((id, index) -> picks.putInt(id.toString(), index));
+        tag.put("coopPicks", picks);
+        NbtCompound pending = new NbtCompound();
+        coopPending.forEach((id, props) -> pending.putString(id.toString(), props));
+        tag.put("coopPending", pending);
         tag.putInt("battleSkill", battleSkill);
         tag.putBoolean("battleDoubles", battleDoubles);
         tag.putString("battleGimmick", battleGimmick);
@@ -172,6 +216,19 @@ public final class RunState {
         state.battleName = tag.getString("battleName");
         state.battleType = tag.getString("battleType");
         state.battleTeam = readStrings(tag, "battleTeam");
+        state.battleName2 = tag.getString("battleName2");
+        state.battleTeam2 = readStrings(tag, "battleTeam2");
+        if (tag.containsUuid("partner")) {
+            state.partnerId = tag.getUuid("partner");
+        }
+        NbtCompound picks = tag.getCompound("coopPicks");
+        for (String key : picks.getKeys()) {
+            state.coopPicks.put(UUID.fromString(key), picks.getInt(key));
+        }
+        NbtCompound pending = tag.getCompound("coopPending");
+        for (String key : pending.getKeys()) {
+            state.coopPending.put(UUID.fromString(key), pending.getString(key));
+        }
         state.battleSkill = tag.getInt("battleSkill");
         state.battleDoubles = tag.getBoolean("battleDoubles");
         state.battleGimmick = tag.getString("battleGimmick");

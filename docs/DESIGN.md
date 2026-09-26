@@ -220,14 +220,29 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
 
 ---
 
-## 6. Co-op (v2, Coop+-inspired)
+## 6. Co-op (done, untested build; Coop+-inspired)
 
-- The party leader invites 1–2 players. Each player has **their own** single starter and catches on their own route nodes.
-- Path choice is decided by vote, or by the leader (configurable).
-- Normal trainers are fought 2v1 (both players against one trainer's doubles team). Gyms and the Champion are 2v2, with the leader and a partner NPC.
-- Each player controls only their own Pokémon, so the format is multi-battle, not shared-party.
-- Whiting out alone doesn't end the run; the run ends only if every player whites out.
-- Each player's journal and swap are independent.
+- **Lobby:**
+  - The host invites a friend (start page → Co-op run, or `/rogue invite`). Invites expire after `coopInviteSeconds`, and the invite is clickable in chat.
+  - Once accepted, both pick a partner from their own collection. The run starts once both have picked, with both journals written before anything is swapped.
+  - The host's run modifiers apply.
+- **State:**
+  - One shared `RunState` holds floor, biome, badges, coins, bag, modifiers and battles. It's stored under the host's id, and the partner's run file is only a `link` to it.
+  - Both players map to the same live object. On login the live instance is reused if the other player is online.
+- **Parties:** each player keeps their own run team, limited to `coopPartyLimit` (3). Level cap, EXP, Move Tutor, bag use and held items are all per player.
+- **Routes:** each player takes a different option or skips. The floor advances when both are done, or when the other player is offline. A full party gets its own release screen (`coopPending`).
+- **Battles:**
+  - Always Cobblemon `MULTI` (2 actors per side, 1 active each): two `PlayerBattleActor`s against two NPC trainers spawned side by side. The generated team is split between them; the lead trainer keeps the ace and the gimmick.
+  - Legendaries fight alongside a same-type companion Pokémon.
+  - A battle starts when both press **Ready** (`/rogue ready` works too). Both must be online, not in another battle, have a Pokémon able to fight, and stand within `coopMaxDistance` of each other in the same dimension.
+- **Results:**
+  - A win or loss is shared (the whole side wins or loses), and the rewards are shared coins.
+  - Nuzlocke releases fainted Pokémon for both players. The run ends if either player has none left.
+  - A legendary joins whichever player has room (host first); otherwise the host gets a release screen.
+- **Ending:**
+  - Any end (loss, win, `/rogue end`, `/rogue endbattle`, `/rogue clean`) finishes the run for both, and each player gets their own token payout.
+  - Offline players get their party back on their next login, because their link no longer resolves.
+  - Save & leave isn't available in co-op: log off instead, and battles wait.
 
 ---
 

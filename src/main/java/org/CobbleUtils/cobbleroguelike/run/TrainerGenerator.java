@@ -34,7 +34,7 @@ public final class TrainerGenerator {
         state.battleKind = kind;
         String name = NAMES[random.nextInt(NAMES.length)];
         boolean boss = kind == NodeType.GYM || kind == NodeType.ELITE || kind == NodeType.CHAMPION;
-        boolean doubles = Modifiers.has(state, Modifiers.ALL_DOUBLES) || switch (config.doubleBattles.toLowerCase(Locale.ROOT)) {
+        boolean doubles = state.isCoop() || Modifiers.has(state, Modifiers.ALL_DOUBLES) || switch (config.doubleBattles.toLowerCase(Locale.ROOT)) {
             case "all" -> true;
             case "none" -> false;
             default -> boss || random.nextDouble() < config.doubleTrainerChance;
@@ -67,14 +67,16 @@ public final class TrainerGenerator {
                 if (!prepareLegendary(state, random)) {
                     // Nothing eligible (e.g. legendaries disabled by datapack): fall back to a trainer.
                     prepare(state, NodeType.TRAINER, random);
+                } else if (state.isCoop()) {
+                    addLegendaryCompanion(state, random);
                 }
-                return; // legendary encounters are always singles and use their natural set
+                return; // legendary encounters use their natural set
             }
             default -> {
                 int level = Scaling.trainerLevel(state) + hardBonus;
                 int size = Math.min(6, 1 + state.badges / 2 + random.nextInt(2));
                 if (doubles) {
-                    size = Math.max(2, size);
+                    size = Math.max(state.isCoop() ? 3 : 2, size);
                 }
                 state.battleName = TRAINER_CLASSES[random.nextInt(TRAINER_CLASSES.length)] + " " + name;
                 state.battleSkill = Math.min(5, 1 + state.badges / 2);
@@ -88,6 +90,42 @@ public final class TrainerGenerator {
         state.battleDoubles = doubles && state.battleTeam.size() >= 2;
         state.battleTeam = strengthen(state, state.battleDoubles, random);
         applyGimmick(state, random);
+        if (state.isCoop()) {
+            splitForCoop(state, random);
+        }
+    }
+
+    /**
+     * Co-op battles are 2 vs 2 (MULTI): the team is split between the main trainer, who keeps the
+     * ace and the gimmick, and a partner trainer.
+     */
+    private static void splitForCoop(RunState state, Random random) {
+        List<String> team = new ArrayList<>(state.battleTeam);
+        if (team.size() < 2) {
+            team.add(0, team.get(0)); // never happens with coop sizes, but keep both sides valid
+        }
+        int partnerSize = team.size() / 2;
+        state.battleTeam2 = new ArrayList<>(team.subList(0, partnerSize));
+        state.battleTeam = new ArrayList<>(team.subList(partnerSize, team.size()));
+        String name = NAMES[random.nextInt(NAMES.length)];
+        boolean boss = state.battleKind == NodeType.GYM || state.battleKind == NodeType.ELITE
+                || state.battleKind == NodeType.CHAMPION;
+        state.battleName2 = boss ? "Ace Trainer " + name : TRAINER_CLASSES[random.nextInt(TRAINER_CLASSES.length)] + " " + name;
+    }
+
+    /** Co-op legendary fights have a second wild Pokémon of the legendary's type at its side. */
+    private static void addLegendaryCompanion(RunState state, Random random) {
+        String legendary = state.battleTeam.get(0);
+        int level = Math.max(2, levelOf(legendary) - 2);
+        String type = CobblemonBridge.primaryType(speciesOf(legendary));
+        List<String> pool = CobblemonBridge.speciesPool(type, Scaling.minBst(level), Scaling.maxBst(level), false);
+        if (pool.isEmpty()) {
+            pool = CobblemonBridge.speciesPool(null, Scaling.minBst(level), Scaling.maxBst(level), false);
+        }
+        pool.sort(String::compareTo);
+        String companion = pool.isEmpty() ? "eevee" : pool.get(random.nextInt(pool.size()));
+        state.battleTeam2 = new ArrayList<>(List.of(companion + " level=" + level));
+        state.battleName2 = "Wild " + capitalize(companion.contains(":") ? companion.substring(companion.indexOf(':') + 1) : companion);
     }
 
     /**

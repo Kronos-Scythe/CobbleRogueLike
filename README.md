@@ -50,7 +50,7 @@ Every run screen has a **nav bar** along the bottom row:
 | How to play | A quick guide |
 | End run | Ends the run (asks for confirmation first) |
 
-Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue saved run** / **End saved run**), **How to play** and the **Rogue Shop**. The Rogue Shop is only available here, not during a run.
+Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue saved run** / **End saved run**), **Co-op run**, **How to play** and the **Rogue Shop**. The Rogue Shop is only available here, not during a run.
 
 ### Features
 
@@ -58,6 +58,13 @@ Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue sav
 - **Biomes:** 12 biomes (Volcano, Tundra, Caves…), each built from **Cobblemon's real spawn data**, so regional forms and addon species appear. Shiny (1/256) and hidden-ability (10%) chances.
 - **Battles:** real Cobblemon NPC trainers with `StrongBattleAI`. Gyms, the Elite Four and the Champion are **double battles** with competitive sets: chosen moves, support moves such as Protect or Fake Out, held items, natures, IVs and EVs.
 - **Modifiers:** Nuzlocke, Solo, Hard, No Shop and All Doubles, each with a token bonus.
+- **Co-op runs** (inspired by Coop+):
+  - Invite a friend from the start page or with `/rogue invite <player>`.
+  - Each of you picks your own partner and keeps **up to 3 Pokémon**. Floors, badges and coins are shared.
+  - **Every battle is a 2 vs 2** (Cobblemon's multi battle): you each control your own Pokémon against two trainers, or a legendary and its companion.
+  - Battles start once you've **both pressed Ready** and are standing together.
+  - On routes, each of you takes a different Pokémon.
+  - Log off any time and the run waits for you. Losing ends the run for both of you.
 - **Mega Showdown (optional):**
   - Buy **gimmick unlocks** (Mega, Z-Moves, Tera, Dynamax) in the run shop, plus mega stones, Z-crystals and Tera shards. No real key items are handed out.
   - **Bosses Mega Evolve or Terastallize.**
@@ -69,6 +76,9 @@ Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue sav
 | `/rogue` | everyone | Open the run menu (or the hub) |
 | `/rogue shop` | outside a run | Spend Rogue Tokens on real items |
 | `/rogue save` | in a run | Save & leave the run |
+| `/rogue invite <player>` | outside a run | Invite a friend to a co-op run |
+| `/rogue accept` / `decline` | invited | Answer a co-op invite |
+| `/rogue ready` | co-op run | Ready up for the next battle |
 | `/rogue tutor` | in a run | Move Tutor |
 | `/rogue end` | in a run | End your run (tokens still paid) |
 | `/rogue endbattle` | in a run | Force-stop a stuck battle **and end the run** |
@@ -82,6 +92,7 @@ Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue sav
 `config/cobbleroguelike.json` is created on first launch. Highlights:
 
 - **Levels and pacing:** `starterLevel`, `resetStarterLevel`, `gymEvery`, `gymCount`, `levelCaps`, `gymTeamSizes`, `eliteCount`, `eliteEvery`
+- **Co-op:** `coopPartyLimit` (3), `coopMaxDistance`, `coopInviteSeconds`
 - **Battles:** `doubleBattles` (`bosses` / `all` / `none`), `doubleTrainerChance`, `bossGimmicks`
 - **Encounters:** `biomes` (Minecraft/Cobblemon biome ids and `#tags`, plus theme types), spawn bucket weights, `shinyChance`, `hiddenAbilityChance`, and the legendary settings
 - **Economy:** `startingMoney`, trainer rewards, the `shop` catalog, `moveTutorPrice`
