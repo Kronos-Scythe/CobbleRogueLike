@@ -31,17 +31,18 @@ public final class RogueMenus {
     public static void hub(ServerPlayerEntity player, boolean confirmAbandon) {
         Menu menu = new Menu(Text.literal("CobbleRogue"));
         if (!RunManager.isInRun(player)) {
-            menu.button(15, Menu.stack("minecraft:amethyst_shard", Text.literal("Rogue Shop").formatted(Formatting.LIGHT_PURPLE), List.of(
-                    Text.literal(RunManager.get().tokens(player) + " Rogue Tokens"),
-                    Text.literal("Spend tokens from past runs on real items."))),
-                    RewardMenus::shop);
-            menu.button(11, Menu.stack("cobblemon:poke_ball", Text.literal("Start a run").formatted(Formatting.GREEN), List.of(
+            menu.button(11, Menu.stack("cobblemon:poke_ball", Text.literal("Start a run").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
                     Text.literal("Pick one of your own Pokémon as your"),
                     Text.literal("only partner and build a team as you go."),
                     Text.literal(""),
                     Text.literal("Your real party is stored safely").formatted(Formatting.YELLOW),
                     Text.literal("and given back when the run ends.").formatted(Formatting.YELLOW))),
                     p -> RunManager.get().start(p));
+            menu.icon(13, guide());
+            menu.button(15, Menu.stack("minecraft:amethyst_shard", Text.literal("Rogue Shop").formatted(Formatting.LIGHT_PURPLE), List.of(
+                    Text.literal(RunManager.get().tokens(player) + " Rogue Tokens"),
+                    Text.literal("Spend tokens from past runs on real items."))),
+                    RewardMenus::shop);
         } else if (confirmAbandon) {
             menu.button(11, Menu.stack("minecraft:lime_concrete", Text.literal("Keep playing").formatted(Formatting.GREEN), List.of()),
                     p -> RunManager.get().openCurrent(p));
@@ -153,7 +154,7 @@ public final class RogueMenus {
     }
 
     public static void path(ServerPlayerEntity player, RunState state) {
-        Menu menu = new Menu(Text.literal("Floor " + state.floor + " - " + Biomes.get(state.biome).name));
+        Menu menu = new Menu(Text.literal("Floor " + state.floor + " - " + Biomes.get(state.biome).name), RUN_ROWS);
         for (int i = 0; i < state.nodeChoices.size() && i < CHOICE_SLOTS.length; i++) {
             int index = i;
             RunState.NodeType node = state.nodeChoices.get(i);
@@ -205,7 +206,7 @@ public final class RogueMenus {
     }
 
     public static void battle(ServerPlayerEntity player, RunState state) {
-        Menu menu = new Menu(Text.literal(state.battleName));
+        Menu menu = new Menu(Text.literal(state.battleName), RUN_ROWS);
         String icon = switch (state.battleKind) {
             case GYM -> "minecraft:gold_block";
             case ELITE -> "minecraft:amethyst_block";
@@ -271,7 +272,7 @@ public final class RogueMenus {
     }
 
     public static void encounter(ServerPlayerEntity player, RunState state) {
-        Menu menu = new Menu(Text.literal("Wild Pokémon appeared!"));
+        Menu menu = new Menu(Text.literal("Wild Pokémon appeared!"), RUN_ROWS);
         for (int i = 0; i < state.encounterOptions.size() && i < CHOICE_SLOTS.length; i++) {
             int index = i;
             String properties = state.encounterOptions.get(i);
@@ -286,7 +287,7 @@ public final class RogueMenus {
     }
 
     public static void release(ServerPlayerEntity player, RunState state) {
-        Menu menu = new Menu(Text.literal("Party full - release one?"));
+        Menu menu = new Menu(Text.literal("Party full - release one?"), RUN_ROWS);
         menu.icon(4, Menu.stack(speciesIcon(state.pendingEncounter), Text.literal("New: " + describeProperties(state.pendingEncounter)).formatted(Formatting.AQUA), List.of()));
         List<Pokemon> party = CobblemonBridge.partyMembers(player);
         for (int i = 0; i < party.size(); i++) {
@@ -302,26 +303,63 @@ public final class RogueMenus {
         menu.open(player);
     }
 
+    private static final int RUN_ROWS = 4;
+    private static final int NAV_ROW = 3;
+
+    /**
+     * The nav bar on every run screen (bottom row): run info, then Shop, Bag, Move Tutor and the
+     * Rogue Shop, a guide, and End run. The rows above hold the screen's own content.
+     */
     private static void addControls(Menu menu, RunState state) {
-        menu.icon(18, Menu.stack("minecraft:map", Text.literal("Floor " + state.floor).formatted(Formatting.WHITE), List.of(
-                Text.literal("Badges: " + state.badges + "/" + RogueConfig.get().gymCount
-                        + (Scaling.championUnlocked(state.badges) && RogueConfig.get().eliteCount > 0
-                        ? "  Elite Four: " + state.eliteWins + "/" + RogueConfig.get().eliteCount : "")),
-                Text.literal("Biome: " + Biomes.get(state.biome).name).formatted(Formatting.AQUA),
-                Text.literal("Level cap: " + Scaling.levelCap(state.badges)),
-                Text.literal("Coins: " + state.money).formatted(Formatting.GOLD),
-                Text.literal(state.modifiers.isEmpty() ? "No modifiers" : "Modifiers: " + String.join(", ", state.modifiers.stream()
-                        .map(id -> Modifiers.ALL.stream().filter(m -> m.id().equals(id)).map(Modifiers.Info::name).findFirst().orElse(id))
-                        .toList())).formatted(Formatting.DARK_PURPLE))));
-        menu.button(19, Menu.stack("minecraft:emerald", Text.literal("Shop").formatted(Formatting.GREEN), List.of(
-                Text.literal(state.money + " coins"),
-                Text.literal("Healing, battle items, training..."))), ShopMenus::shop);
-        menu.button(20, Menu.stack("minecraft:chest", Text.literal("Bag & team items").formatted(Formatting.AQUA), List.of(
-                Text.literal("Use items and manage held items."))), p -> ShopMenus.bag(p, 0));
-        menu.button(21, Menu.stack("minecraft:enchanted_book", Text.literal("Move Tutor").formatted(Formatting.LIGHT_PURPLE), List.of(
+        RogueConfig config = RogueConfig.get();
+        int base = NAV_ROW * 9;
+        menu.fillRow(NAV_ROW, "minecraft:black_stained_glass_pane");
+
+        List<Text> info = new ArrayList<>();
+        info.add(Text.literal("Biome: " + Biomes.get(state.biome).name).formatted(Formatting.AQUA));
+        info.add(Text.literal("Badges: " + state.badges + "/" + config.gymCount
+                + (Scaling.championUnlocked(state.badges) && config.eliteCount > 0
+                ? "  Elite Four: " + state.eliteWins + "/" + config.eliteCount : "")));
+        info.add(Text.literal("Level cap: " + Scaling.levelCap(state.badges)));
+        info.add(Text.literal("Coins: " + state.money).formatted(Formatting.GOLD));
+        if (!state.modifiers.isEmpty()) {
+            info.add(Text.literal("Modifiers: " + String.join(", ", state.modifiers.stream()
+                    .map(id -> Modifiers.ALL.stream().filter(m -> m.id().equals(id)).map(Modifiers.Info::name).findFirst().orElse(id))
+                    .toList())).formatted(Formatting.DARK_PURPLE));
+        }
+        menu.icon(base, Menu.stack("minecraft:filled_map", Text.literal("Floor " + state.floor).formatted(Formatting.WHITE), info));
+
+        if (Modifiers.has(state, Modifiers.NO_SHOP)) {
+            menu.icon(base + 2, Menu.stack("minecraft:gray_dye", Text.literal("Shop (closed)").formatted(Formatting.GRAY), List.of(
+                    Text.literal("No Shop run."))));
+        } else {
+            menu.button(base + 2, Menu.stack("minecraft:emerald", Text.literal("Shop").formatted(Formatting.GREEN), List.of(
+                    Text.literal(state.money + " coins"),
+                    Text.literal("Healing, battle items, training…"))), ShopMenus::shop);
+        }
+        menu.button(base + 3, Menu.stack("minecraft:chest", Text.literal("Bag").formatted(Formatting.AQUA), List.of(
+                Text.literal("Use items, manage held items."))), p -> ShopMenus.bag(p, 0));
+        menu.button(base + 4, Menu.stack("minecraft:enchanted_book", Text.literal("Move Tutor").formatted(Formatting.LIGHT_PURPLE), List.of(
                 Text.literal("Teach TM, tutor and egg moves."))), TutorMenus::pickPokemon);
-        menu.button(26, Menu.stack("minecraft:barrier", Text.literal("End run").formatted(Formatting.RED), List.of()),
-                p -> hub(p, true));
+        menu.button(base + 5, Menu.stack("minecraft:amethyst_shard", Text.literal("Rogue Shop").formatted(Formatting.DARK_PURPLE), List.of(
+                Text.literal("Spend Rogue Tokens on real items."))), RewardMenus::shop);
+        menu.icon(base + 6, guide());
+        menu.button(base + 8, Menu.stack("minecraft:barrier", Text.literal("End run").formatted(Formatting.RED), List.of(
+                Text.literal("Asks for confirmation."))), p -> hub(p, true));
+    }
+
+    /** A short how-to-play book shown on the hub and in the nav bar. */
+    private static ItemStack guide() {
+        return Menu.stack("minecraft:book", Text.literal("How to play").formatted(Formatting.WHITE), List.of(
+                Text.literal("Pick a path card each floor: routes add"),
+                Text.literal("Pokémon, trainers pay coins, rests heal."),
+                Text.literal("Every 5th floor is a gym; after 8 badges"),
+                Text.literal("come the Elite Four and the Champion."),
+                Text.literal("Losing ends the run, but you always earn"),
+                Text.literal("Rogue Tokens for /rogue shop."),
+                Text.literal(""),
+                Text.literal("Commands: /rogue, /rogue shop, /rogue tutor,").formatted(Formatting.DARK_GRAY),
+                Text.literal("/rogue end, /rogue endbattle, /rogue clean").formatted(Formatting.DARK_GRAY)));
     }
 
     /** Model icon for a property string like {@code "zubat level=7"}, falling back to a Poké Ball. */

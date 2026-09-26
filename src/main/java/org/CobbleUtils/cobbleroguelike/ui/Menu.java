@@ -39,10 +39,10 @@ public final class Menu {
         this(title, 3);
     }
 
-    /** {@code rows} is 3 or 6. */
+    /** {@code rows} is 1 to 6. */
     public Menu(Text title, int rows) {
         this.title = title;
-        this.rows = rows == 6 ? 6 : 3;
+        this.rows = Math.max(1, Math.min(6, rows));
         this.inventory = new SimpleInventory(this.rows * 9);
     }
 
@@ -61,6 +61,16 @@ public final class Menu {
 
     public Menu icon(int slot, ItemStack icon) {
         return clickButton(slot, icon, null);
+    }
+
+    /** Fills a whole row with a separator pane (e.g. a nav bar background). */
+    public Menu fillRow(int row, String paneItemId) {
+        ItemStack pane = stack(paneItemId, Text.literal(" "), List.of());
+        for (int slot = row * 9; slot < row * 9 + 9 && slot < inventory.size(); slot++) {
+            inventory.setStack(slot, pane.copy());
+            actions.remove(slot);
+        }
+        return this;
     }
 
     int rows() {

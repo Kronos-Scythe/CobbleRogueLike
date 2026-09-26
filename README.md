@@ -37,10 +37,19 @@ The Gradle daemon runs on Java 25 (see `gradle/gradle-daemon-jvm.properties`). T
 4. **After 8 badges**, 4 Elite Four battles, then **the Champion**. Beat them to win.
 5. **Losing or forfeiting ends the run.** Either way you earn **Rogue Tokens** to spend in `/rogue shop`.
 
-Between battles, every run screen has:
-- **Shop:** coins for healing items, competitive held items, berries, mints, evolution items and more.
-- **Bag:** use items, give or take held items, and move items between Pokémon.
-- **Move Tutor:** level-up moves are free; TM, tutor and egg moves cost coins.
+Every run screen has a **nav bar** along the bottom row:
+
+| Button | What it does |
+|---|---|
+| Floor info | Biome, badges, level cap, coins and modifiers |
+| Shop | Spend coins on healing items, competitive held items, berries, mints, evolution items… |
+| Bag | Use items, give or take held items, and move items between Pokémon |
+| Move Tutor | Level-up moves are free; TM, tutor and egg moves cost coins |
+| Rogue Shop | Spend Rogue Tokens on real items |
+| How to play | A quick guide |
+| End run | Ends the run (asks for confirmation first) |
+
+Outside a run, `/rogue` opens the hub with **Start a run**, **How to play** and the **Rogue Shop**.
 
 ### Features
 

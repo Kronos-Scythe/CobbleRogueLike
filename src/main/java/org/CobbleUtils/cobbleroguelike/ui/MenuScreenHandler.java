@@ -17,8 +17,7 @@ public final class MenuScreenHandler extends GenericContainerScreenHandler {
     private boolean clicked = false;
 
     public MenuScreenHandler(int syncId, PlayerInventory playerInventory, Menu menu) {
-        super(menu.rows() == 6 ? ScreenHandlerType.GENERIC_9X6 : ScreenHandlerType.GENERIC_9X3,
-                syncId, playerInventory, menu.inventory(), menu.rows());
+        super(typeFor(menu.rows()), syncId, playerInventory, menu.inventory(), menu.rows());
         this.menu = menu;
     }
 
@@ -36,6 +35,17 @@ public final class MenuScreenHandler extends GenericContainerScreenHandler {
         }
         // Undo whatever the client predicted.
         syncState();
+    }
+
+    private static ScreenHandlerType<GenericContainerScreenHandler> typeFor(int rows) {
+        return switch (rows) {
+            case 1 -> ScreenHandlerType.GENERIC_9X1;
+            case 2 -> ScreenHandlerType.GENERIC_9X2;
+            case 4 -> ScreenHandlerType.GENERIC_9X4;
+            case 5 -> ScreenHandlerType.GENERIC_9X5;
+            case 6 -> ScreenHandlerType.GENERIC_9X6;
+            default -> ScreenHandlerType.GENERIC_9X3;
+        };
     }
 
     @Override

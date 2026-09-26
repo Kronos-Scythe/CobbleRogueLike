@@ -32,7 +32,9 @@ public final class RewardMenus {
                     Text.literal(category.items().size() + " items"))),
                     p -> category(p, index, 0));
         }
-        menu.icon(49, profileIcon(player));
+        menu.icon(48, profileIcon(player));
+        menu.button(49, Menu.stack("minecraft:oak_door", Text.literal("Back"), List.of()),
+                p -> RunManager.get().openCurrent(p));
         menu.open(player);
     }
 
