@@ -109,19 +109,51 @@ public final class RogueConfig {
     public int metaEncounterFromBadge = 1;
     public int metaTopFromBadge = 4;
     public double metaHiddenAbilityChance = 0.3;
+    /** A-tier competitive picks (from metaEncounterFromBadge). */
     public List<String> metaPoolStrong = new ArrayList<>(List.of(
-            "gyarados", "lucario", "clefable", "blissey", "hippowdon", "breloom", "conkeldurr", "gardevoir",
-            "alakazam", "starmie", "magnezone", "amoonguss", "talonflame", "ninetales alolan", "slowbro",
-            "mamoswine", "krookodile", "haxorus", "chandelure", "kingdra", "pelipper", "torkoal", "arcanine",
-            "espathra", "garganacl", "armarouge", "tinkaton", "grimmsnarl", "hatterene", "skeledirge",
-            "quaquaval", "dondozo", "heracross", "infernape", "swampert", "hawlucha", "sableye", "whimsicott",
-            "porygon2", "clodsire", "glimmora", "rotom", "bisharp", "togekiss", "jolteon", "sylveon"));
+            "arcanine", "arcanine hisuian", "ninetales", "starmie", "alakazam", "gardevoir", "gallade", "togekiss",
+            "sylveon", "jolteon", "espeon", "umbreon", "vaporeon", "hippowdon", "krookodile", "chandelure",
+            "politoed", "ludicolo", "venusaur", "charizard", "blastoise", "swampert", "infernape", "emboar",
+            "serperior", "samurott", "decidueye", "incineroar", "heracross", "pinsir", "scyther", "kleavor",
+            "talonflame", "staraptor", "noivern", "flygon", "altaria", "crobat", "whimsicott", "jellicent",
+            "sableye", "spiritomb", "drapion", "toxicroak", "slowbro", "slowking", "slowbro galarian", "reuniclus",
+            "bronzong", "porygonz", "snorlax", "tauros", "kangaskhan", "medicham", "mawile", "lopunny", "sharpedo",
+            "camerupt", "banette", "absol", "manectric", "houndoom", "aggron", "steelix", "ampharos", "pidgeot",
+            "beedrill", "aerodactyl", "sceptile", "armarouge", "quaquaval", "clodsire", "orthworm", "kilowattrel",
+            "bellibolt", "revavroom", "cyclizar", "houndstone", "rotom", "rotom frost", "rotom mow", "rotom fan",
+            "zoroark", "druddigon", "bisharp", "forretress", "donphan", "hitmontop", "machamp", "toucannon",
+            "lycanroc", "salazzle", "tsareena", "golisopod", "toxtricity", "centiskorch", "drednaw", "coalossal",
+            "barraskewda", "polteageist", "frosmoth", "copperajah", "duraludon", "dracozolt", "dracovish", "falinks",
+            "obstagoon", "runerigus", "grapploct", "mienshao", "scrafty", "galvantula", "eelektross", "crustle",
+            "chesnaught", "delphox", "pangoro", "aurorus", "tyrantrum", "dedenne", "klefki", "trevenant",
+            "gourgeist", "avalugg", "vikavolt", "ribombee", "mudsdale", "araquanid", "lurantis", "bewear",
+            "oranguru", "passimian", "palossand", "turtonator", "togedemaru", "drampa", "dhelmise", "perrserker",
+            "sirfetchd", "cramorant", "indeedee", "morpeko", "dubwool", "pawmot", "maushold", "dachsbun", "arboliva",
+            "garganacl", "scovillain", "tatsugiri", "veluza", "farigiraf", "dudunsparce", "flamigo", "lokix",
+            "brambleghast", "toedscruel", "mabosstiff", "grafaiai", "squawkabilly", "bombirdier", "cetitan", "klawf",
+            "wugtrio"));
+    /** S-tier picks: pseudo-legendaries, Megas, OU staples (from metaTopFromBadge, counted twice). */
     public List<String> metaPoolTop = new ArrayList<>(List.of(
-            "garchomp", "dragonite", "tyranitar", "metagross", "salamence", "dragapult", "kingambit",
-            "gholdengo", "volcarona", "baxcalibur", "hydreigon", "gliscor", "toxapex", "ferrothorn",
-            "corviknight", "scizor", "gengar", "greninja", "rillaboom", "cinderace", "excadrill", "mimikyu",
-            "weavile", "azumarill", "ceruledge", "meowscarada", "annihilape", "palafin"));
+            "garchomp", "dragonite", "tyranitar", "metagross", "salamence", "dragapult", "kingambit", "gholdengo",
+            "volcarona", "baxcalibur", "hydreigon", "kommoo", "goodra", "goodra hisuian", "haxorus", "gliscor",
+            "toxapex", "ferrothorn", "corviknight", "skarmory", "scizor", "gengar", "greninja", "aegislash",
+            "mimikyu", "rillaboom", "cinderace", "blaziken", "excadrill", "weavile", "sneasler", "azumarill",
+            "ceruledge", "meowscarada", "annihilape", "palafin", "ursaluna", "rotom wash", "rotom heat",
+            "slowking galarian", "primarina", "clefable", "blissey", "glimmora", "cloyster", "darmanitan",
+            "darmanitan galarian", "typhlosion hisuian", "samurott hisuian", "zoroark hisuian", "archaludon",
+            "hydrapple", "sinistcha", "dondozo", "basculegion", "lucario", "hawlucha", "breloom", "conkeldurr",
+            "magnezone", "tinkaton", "skeledirge", "dragalge", "hatterene", "grimmsnarl", "torterra", "mamoswine",
+            "kingdra", "gyarados", "alomomola", "quagsire", "chansey", "porygon2", "amoonguss", "ninetales alolan",
+            "pelipper", "torkoal", "espathra"));
+    /** Paradox Pokémon, the strongest non-legendaries (from metaEliteFromBadge). */
+    public int metaEliteFromBadge = 6;
+    public List<String> metaPoolElite = new ArrayList<>(List.of(
+            "greattusk", "ironvaliant", "fluttermane", "ironmoth", "roaringmoon", "ironbundle", "ironhands",
+            "walkingwake", "ironleaves", "gougingfire", "ragingbolt", "ironboulder", "ironcrown", "sandyshocks",
+            "screamtail", "brutebonnet", "slitherwing", "irontreads", "ironjugulis", "ironthorns"));
 
+    /** Chance that one of a route's options wanders in from another biome, for variety. */
+    public double wanderingChance = 0.2;
     /** Each badge makes rare route spawns more common (0.075 = rare/common odds flatten 7.5% per badge, max 60%). */
     public double encounterRarityPerBadge = 0.075;
 

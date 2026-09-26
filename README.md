@@ -29,8 +29,8 @@ The Gradle daemon runs on Java 25 (see `gradle/gradle-daemon-jvm.properties`). T
 
 1. **`/rogue` → Start a run.** Toggle optional **modifiers**, then pick a partner from your party or PC. A copy joins the run at level 5, and your real party is saved safely until the run ends.
 2. **Each floor, choose 1 of 3 path cards:**
-   - **Route:** each route card is its own biome (Desert, Tundra, Volcano…, shown by its block). Pick one of 3 wild Pokémon from it. Later in the run they come evolved for their level and rare spawns show up more often.
-   - **Rare encounter** (from the 1st badge, ~8% of floors): pick one of 3 strong competitive Pokémon (Garchomp, Gholdengo, Dragapult… from the 4th badge).
+   - **Route:** each route card is its own biome (Desert, Tundra, Volcano…, shown by its block). Pick one of 3 wild Pokémon from it. Later in the run they come evolved for their level and rare spawns show up more often. The 3 options avoid sharing a main type, and one sometimes wanders in from another biome.
+   - **Rare encounter** (from the 1st badge, ~8% of floors): pick one of 3 strong competitive Pokémon: ~160 A-tier picks, ~80 S-tier (Garchomp, Gholdengo, Dragapult…) from the 4th badge and paradox Pokémon from the 6th.
    - **Trainer:** fight an AI trainer (NPC) and earn coins.
    - **Rest stop:** full heal.
    - **Legendary:** fight a legendary and it joins you if you win (after badges 3 and 6, rarely otherwise; co-op after badges 4 and 7).
@@ -119,7 +119,7 @@ Run modifiers (Nuzlocke, Hard…) stay optional. To make the game easier, lower 
 - **Balance:** `expMultiplier` (2× EXP for run Pokémon), `catchUpExp`, `rampUntilBadge`, `startRouteFloors`, `prepTrainToCap`, `prepDraft`, `prepHeal`, `prepDraftOptions`
 - **Difficulty:** `setTierBonus`, `maxTrainerAi`, `trainerArchetypesFromBadge`, `healAfterGym`, `healAfterElite`
 - **Battles:** `bossArchetypes`, `archetypeFromBadge`, `bossTeraFromBadge`, `bossMegaFromBadge`, `doubleBattles` (`bosses` / `all` / `none`), `doubleTrainerChance`, `bossGimmicks`
-- **Encounters:** `biomes` (Minecraft/Cobblemon biome ids and `#tags`, plus theme types), spawn bucket weights, `shinyChance`, `hiddenAbilityChance`, `evolveEncounters`, `encounterRarityPerBadge`, the Rare encounter (`metaEncounterChance`, `metaPoolStrong`, `metaPoolTop`) and the legendary settings
+- **Encounters:** `biomes` (Minecraft/Cobblemon biome ids and `#tags`, plus theme types), spawn bucket weights, `shinyChance`, `hiddenAbilityChance`, `evolveEncounters`, `encounterRarityPerBadge`, `wanderingChance`, the Rare encounter (`metaEncounterChance`, `metaPoolStrong`, `metaPoolTop`, `metaPoolElite`) and the legendary settings
 - **Economy:** `startingMoney`, trainer rewards, the `shop` catalog (held items priced by how strong they are competitively), `megaStonePrices`, `prepHealPrice`, `moveTutorPrice`
 - **Rewards:** `tokensPerFloor`, `tokensPerBadge`, `championTokenBonus`, the `tokenShop` catalog, modifier bonuses
 - **UI:** `clientScreen` (use the run screen for players who have the mod), each biome's `block`
