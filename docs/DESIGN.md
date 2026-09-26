@@ -73,6 +73,11 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
   - Picks are weighted by spawn bucket (common 60 / uncommon 28 / rare 10 / ultra-rare 2) within a strength window for the level, and are distinct by species.
   - Fallbacks, in order: the whole biome pool, then the biome's types, then the configured encounter pool.
   - Pools are cached and rebuilt on `/reload` or `/rogue admin reload`.
+- **Late-run encounters:** route levels follow the trainer ramp (≈ the previous cap up to 85% of the next), and the species window is by base stat total (`maxBst` = 260 + 6 × level, capped at 720). On top of that:
+  - `evolveEncounters`: route Pokémon come evolved for their level (level evolutions at their level, stone/trade evolutions from `itemEvolutionLevel` 32, friendship/other from `otherEvolutionLevel` 30; branches at random), so the window's lower bound is relaxed by 120 BST.
+  - `encounterRarityPerBadge` (0.075): spawn weights are flattened as weight^(1 − 0.075 × badges), capped at 0.6, so rare and ultra-rare spawns show up much more often late.
+- **Variety:** the 3 route options avoid repeating a main type while other types are available, and with `wanderingChance` (20%) one option comes from a random other biome (same strength window).
+- **Rare encounter** (`META` node): from `metaEncounterFromBadge` (1), `metaEncounterChance` (8%) of normal floors get a card offering 3 Pokémon from `metaPoolStrong` (~160 A-tier competitive picks, including regional forms and Mega-capable Pokémon), plus `metaPoolTop` (~80 S-tier: pseudo-legendaries and OU staples, counted twice) from `metaTopFromBadge` (4), plus `metaPoolElite` (paradox Pokémon, counted twice) from `metaEliteFromBadge` (6). No legendaries; 30% hidden ability chance. Not in Solo. Unknown species ids are skipped, so the pools are safe to edit.
 - **Extras:** route and legendary Pokémon roll a shiny chance (1/256) and a hidden-ability chance (10%). Menus show form, shiny and hidden ability, with form-accurate model icons.
 - **Legendary encounters:**
   - A Legendary card is guaranteed on the first floor after badges 3 and 6 (`legendaryAfterBadges`), and has a 1% chance on other floors from 2 badges on (`legendaryChance`, `legendaryChanceFromBadge`).
@@ -107,7 +112,7 @@ Hard bosses need a way to catch up, like Emerald Rogue's level-1 Chansey but wit
 - **Boss prep** on every gym, Elite Four and Champion preview, once each per boss and per player (co-op too), tracked in `prepUsed`:
   - **Train to level cap:** gives each run Pokémon exactly the EXP to reach the cap via `addExperienceWithPlayer`, so level-up moves, evolutions and the EXP screen behave normally.
   - **Draft a counter** (only with the Counter Draft modifier, since it made every run too easy): pick 1 of `prepDraftOptions` (3) Pokémon at the cap whose type hits the boss's type super effectively (`TypeChart`), or any strong Pokémon for the Champion. No legendaries. A full team uses the per-player release screen (`coopPending`, now used in solo too).
-  - **Full heal:** gyms and the Elite Four don't heal by default.
+  - **Full heal:** gyms and the Elite Four don't heal by default. Free before the first gym; after that it costs `prepHealPrice` + `prepHealPricePerBadge` × badges (2000 + 750 each), paid from the shared coins.
 
 ### Boss archetypes (hard, planned teams)
 
@@ -200,6 +205,7 @@ Chosen on a setup screen before the partner picker. Each adds a Rogue Token bonu
 ### Economy, shop and bag
 
 - **Coins** exist only for the run. You start with `startingMoney` (1500). Each win pays `trainerRewardBase + strongestLevel × trainerRewardPerLevel`: ×4 for gyms and ×8 for the Champion.
+- Held items are priced by competitive strength: Leftovers, Life Orb, Choice items, Focus Sash, Assault Vest and Eviolite 6000; Boots, Rocky Helmet, Weakness Policy, Loaded Dice and similar staples 4000; niche items 2500; weak ones 1200. `shopVersion` replaces an older config's shop catalog (and Mega Stone prices) with the new defaults once.
 - The **shop** is open from every run menu between battles. Its categories are Healing, Battle Items (competitive held items), Type Boosters, Berries, Training (candies, vitamins, ability capsule/patch, all mints) and Evolution. Left-click buys 1 and right-click buys 5. Categories, items and prices live in the config, and unknown item ids are hidden.
 - The **bag** is virtual run state and never touches the real inventory. Clicking an item and then a Pokémon either **uses** it (potions, revives, mints, vitamins, stones: Cobblemon's own item logic runs on a temporary stack) or **gives** it to hold (the old held item goes back to the bag). The party row shows HP and held items, and clicking a Pokémon moves its held item into the bag. That's how items move between Pokémon.
 - Held items can only change through the bag during a run (the held-item guard has a bypass just for it). Everything in the bag and on rogue Pokémon disappears when the run ends.
@@ -209,7 +215,7 @@ Chosen on a setup screen before the partner picker. Each adds a Rogue Token bonu
 
 When `mega_showdown` is installed, the shop adds:
 - **Gimmick unlocks:** Mega Evolution, Z-Moves, Terastallization and Dynamax.
-- **Mega Stones** and **Z-Crystals** as held items.
+- **Mega Stones** and **Z-Crystals** as held items. Mega Stones are priced by how strong the Mega is (`megaStonePrices`): top Megas (Metagross, Gengar, Kangaskhan, Salamence, Mewtwo…) 12000, solid ones 8000, the rest `megaStonePrice` (5000).
 - **Tera Shards**, used from the bag with Mega Showdown's own logic, which needs its configured number of shards.
 
 These are listed from Mega Showdown's item tags, so there's no compile-time dependency.
@@ -302,6 +308,7 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
     - Each slot has a `Menu.Role`: CONTENT (the options), INFO (description boxes above them), FOOTER (nav row, page arrows, secondary actions) or BACK. By default clickable slots are content, others info, and the nav row is the footer.
     - `Menu.Layout` picks how content is drawn: CARDS (a few big cards: hub, path, encounters, boss preview), GRID (icon tiles at their chest positions: partner picker, bag, invites), LIST (rows with a summary line: shop items, moves) or PAGE (text sections: How to play).
     - In a run: party on the left, the options in the middle, progress (stats and tower) on the right.
+    - Size: laid out at 460×240 units and scaled to fill ~90% of the window whatever the GUI scale is, in whole screen-pixel steps so the font stays crisp (e.g. 1.5× at GUI scale 2 on 1080p). Mouse input and scissor rectangles are converted to layout units; tooltips draw at normal size.
     - Close is always bottom-left, Back bottom-right, footer buttons in between (icon-only when they don't fit).
     - After a run battle (win, loss or interruption) the next screen opens by itself once Cobblemon has released the battle (`openWhenFree`, retried every second); ending a run shows the start page.
     - To avoid repeats, `Menu.chestOnly` hides slots the run screen already shows (coins, floor info, partner), and `Menu.screenTitle` gives shorter titles (no coin counts). How to play is only on the start page. Clicks come back as `RogueNetwork.Click(viewId, slot, button)`; stale views are ignored. `Menu.close` / `Menu.isOpen` cover both kinds of screen.

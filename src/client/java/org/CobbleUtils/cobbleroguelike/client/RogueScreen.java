@@ -68,7 +68,15 @@ public final class RogueScreen extends Screen {
     static boolean replacing;
 
     private final RogueView view;
+    /** Layout size in screen units; the panel is drawn at {@link #scale} times this. */
+    private static final int BASE_W = 460;
+    private static final int BASE_H = 240;
+
+    /** Panel bounds in layout units (x0, y0 are 0: the matrix moves the panel into place). */
     private int x0, y0, w, h;
+    /** Layout-to-GUI scale and the panel's top-left corner in GUI coordinates. */
+    private float scale = 1F;
+    private float originX, originY;
     private int scroll;
     private int maxScroll;
     /** Clickable areas from the last frame. */
@@ -85,10 +93,33 @@ public final class RogueScreen extends Screen {
 
     @Override
     protected void init() {
-        w = Math.min(460, width - 8);
-        h = Math.min(240, height - 8);
-        x0 = (width - w) / 2;
-        y0 = (height - h) / 2;
+        // Fill most of the window whatever the GUI scale is, in whole screen-pixel steps so the
+        // font stays crisp: at GUI scale 2 the panel is drawn 1.5x or 2x, at scale 4 it's 1x.
+        double guiScale = client != null ? client.getWindow().getScaleFactor() : 1.0;
+        double fit = Math.min(width * 0.9 / BASE_W, height * 0.9 / BASE_H);
+        double pixels = Math.floor(fit * guiScale);
+        scale = (float) Math.max(1.0, pixels / guiScale);
+        w = scale > 1F ? BASE_W : Math.min(BASE_W, width - 8);
+        h = scale > 1F ? BASE_H : Math.min(BASE_H, height - 8);
+        x0 = 0;
+        y0 = 0;
+        originX = (width - w * scale) / 2F;
+        originY = (height - h * scale) / 2F;
+    }
+
+    /** GUI mouse coordinates to layout units. */
+    private double layoutX(double mouseX) {
+        return (mouseX - originX) / scale;
+    }
+
+    private double layoutY(double mouseY) {
+        return (mouseY - originY) / scale;
+    }
+
+    /** Scissor rectangles are in GUI coordinates (the matrix doesn't apply to them). */
+    private void scissor(DrawContext context, int x1, int y1, int x2, int y2) {
+        context.enableScissor((int) Math.floor(originX + x1 * scale), (int) Math.floor(originY + y1 * scale),
+                (int) Math.ceil(originX + x2 * scale), (int) Math.ceil(originY + y2 * scale));
     }
 
     @Override
@@ -133,9 +164,15 @@ public final class RogueScreen extends Screen {
     // ------------------------------------------------------------------ rendering
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.render(context, mouseX, mouseY, delta);
+    public void render(DrawContext context, int guiMouseX, int guiMouseY, float delta) {
+        super.render(context, guiMouseX, guiMouseY, delta);
         hits.clear();
+        int mouseX = (int) Math.floor(layoutX(guiMouseX));
+        int mouseY = (int) Math.floor(layoutY(guiMouseY));
+        MatrixStack matrices = context.getMatrices();
+        matrices.push();
+        matrices.translate(originX, originY, 0);
+        matrices.scale(scale, scale, 1F);
 
         context.fill(x0, y0, x0 + w, y0 + h, FRAME_BG);
         context.drawBorder(x0, y0, w, h, FRAME_OUTER);
@@ -159,9 +196,11 @@ public final class RogueScreen extends Screen {
         }
         renderContent(context, mouseX, mouseY, tooltip);
         renderFooter(context, mouseX, mouseY, tooltip);
+        matrices.pop();
 
+        // Tooltips at normal size, at the real mouse position.
         if (tooltip.stack != null) {
-            context.drawItemTooltip(textRenderer, tooltip.stack, mouseX, mouseY);
+            context.drawItemTooltip(textRenderer, tooltip.stack, guiMouseX, guiMouseY);
         }
     }
 
@@ -289,7 +328,7 @@ public final class RogueScreen extends Screen {
             maxScroll = 0;
             return;
         }
-        context.enableScissor(ax, y, ax + aw, y + ah);
+        scissor(context, ax, y, ax + aw, y + ah);
         switch (view.layout) {
             case CARDS -> renderCards(context, ax, y, aw, ah, mouseX, mouseY, tooltip);
             case GRID -> renderGrid(context, ax, y, aw, ah, mouseX, mouseY, tooltip);
@@ -557,7 +596,9 @@ public final class RogueScreen extends Screen {
     // ------------------------------------------------------------------ input
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(double guiMouseX, double guiMouseY, int button) {
+        double mouseX = layoutX(guiMouseX);
+        double mouseY = layoutY(guiMouseY);
         if (button == 0 || button == 1) {
             for (Hit hit : hits) {
                 if (inside(mouseX, mouseY, hit.x(), hit.y(), hit.w(), hit.h())) {
@@ -571,7 +612,7 @@ public final class RogueScreen extends Screen {
                 }
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(guiMouseX, guiMouseY, button);
     }
 
     @Override
@@ -625,7 +666,7 @@ public final class RogueScreen extends Screen {
         Block block = id == null ? Blocks.AIR : Registries.BLOCK.get(id);
         if (block != Blocks.AIR && client != null) {
             Sprite sprite = client.getBlockRenderManager().getModels().getModelParticleSprite(block.getDefaultState());
-            context.enableScissor(x, y, x + width, y + height);
+            scissor(context, x, y, x + width, y + height);
             for (int tx = x; tx < x + width; tx += 16) {
                 for (int ty = y; ty < y + height; ty += 16) {
                     context.drawSprite(tx, ty, 0, 16, 16, sprite);

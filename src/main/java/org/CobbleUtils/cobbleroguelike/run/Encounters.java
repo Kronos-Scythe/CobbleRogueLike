@@ -28,10 +28,12 @@ public final class Encounters {
         int level = Scaling.encounterLevel(state);
         int count = config.encounterOptions;
 
-        List<Candidate> all = SpawnData.candidates(biome);
+        List<Candidate> all = flattenRarity(SpawnData.candidates(biome), state.badges);
+        // With evolveEncounters, weaker basics are fine late on: they come evolved.
+        int minBst = Scaling.minBst(level) - 80 - (config.evolveEncounters ? 120 : 0);
         List<Candidate> pool = new ArrayList<>();
         for (Candidate candidate : all) {
-            if (candidate.bst() >= Scaling.minBst(level) - 80 && candidate.bst() <= Scaling.maxBst(level) + 20) {
+            if (candidate.bst() >= minBst && candidate.bst() <= Scaling.maxBst(level) + 20) {
                 pool.add(candidate);
             }
         }
@@ -53,11 +55,111 @@ public final class Encounters {
             }
         }
 
+        List<Candidate> picks = pickWeighted(pool, count, random);
+        // Variety: sometimes one option wanders in from another biome.
+        if (picks.size() >= 2 && random.nextDouble() < config.wanderingChance) {
+            Candidate wanderer = wanderer(state, level, minBst, picks, random);
+            if (wanderer != null) {
+                picks.set(picks.size() - 1, wanderer);
+            }
+        }
         List<String> result = new ArrayList<>();
-        for (Candidate picked : pickWeighted(pool, count, random)) {
-            result.add(withExtras(picked.properties() + " level=" + level, random));
+        for (Candidate picked : picks) {
+            String properties = picked.properties() + " level=" + level;
+            if (config.evolveEncounters) {
+                properties = CobblemonBridge.evolvedForLevel(properties, level, config.itemEvolutionLevel,
+                        config.otherEvolutionLevel, random);
+            }
+            result.add(withExtras(properties, random));
         }
         return result;
+    }
+
+    /** A spawn from a random other biome, within the same strength window, not already offered. */
+    private static Candidate wanderer(RunState state, int level, int minBst, List<Candidate> offered, Random random) {
+        List<RogueConfig.RogueBiome> biomes = new ArrayList<>(RogueConfig.get().biomes);
+        biomes.removeIf(b -> b.id.equals(state.biome));
+        if (biomes.isEmpty()) {
+            return null;
+        }
+        RogueConfig.RogueBiome other = biomes.get(random.nextInt(biomes.size()));
+        Set<String> taken = new HashSet<>();
+        offered.forEach(c -> taken.add(c.species()));
+        List<Candidate> pool = new ArrayList<>();
+        for (Candidate candidate : flattenRarity(SpawnData.candidates(other), state.badges)) {
+            if (!taken.contains(candidate.species()) && candidate.bst() >= minBst && candidate.bst() <= Scaling.maxBst(level) + 20) {
+                pool.add(candidate);
+            }
+        }
+        List<Candidate> picked = pickWeighted(pool, 1, random);
+        return picked.isEmpty() ? null : picked.get(0);
+    }
+
+    /**
+     * Rare spawns get more common with each badge: weights are flattened toward each other
+     * (weight^(1 - t), t = encounterRarityPerBadge * badges, at most 0.6).
+     */
+    private static List<Candidate> flattenRarity(List<Candidate> candidates, int badges) {
+        double t = Math.max(0, Math.min(0.6, RogueConfig.get().encounterRarityPerBadge * badges));
+        if (t <= 0) {
+            return candidates;
+        }
+        List<Candidate> result = new ArrayList<>();
+        for (Candidate candidate : candidates) {
+            int weight = (int) Math.max(1, Math.round(100 * Math.pow(Math.max(1, candidate.weight()), 1 - t)));
+            result.add(new Candidate(candidate.properties(), candidate.species(), weight, candidate.bst()));
+        }
+        return result;
+    }
+
+    /**
+     * Rare encounter: 3 strong competitive Pokémon (the config meta pools) at route level. The top
+     * pool joins in from {@code metaTopFromBadge} badges and the paradox pool from
+     * {@code metaEliteFromBadge}.
+     */
+    public static List<String> rollMeta(RunState state, Random random) {
+        RogueConfig config = RogueConfig.get();
+        int level = Scaling.encounterLevel(state);
+        List<String> pool = new ArrayList<>();
+        for (String species : config.metaPoolStrong) {
+            addIfExists(pool, species);
+        }
+        if (state.badges >= config.metaTopFromBadge) {
+            for (String species : config.metaPoolTop) {
+                addIfExists(pool, species);
+                addIfExists(pool, species); // top picks count twice
+            }
+        }
+        if (state.badges >= config.metaEliteFromBadge) {
+            for (String species : config.metaPoolElite) {
+                addIfExists(pool, species);
+                addIfExists(pool, species);
+            }
+        }
+        List<String> result = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        while (result.size() < config.encounterOptions && !pool.isEmpty()) {
+            String picked = pool.remove(random.nextInt(pool.size()));
+            if (!seen.add(picked)) {
+                continue;
+            }
+            String properties = picked + " level=" + level;
+            if (random.nextDouble() < config.metaHiddenAbilityChance) {
+                properties += " hiddenability=yes";
+            }
+            if (random.nextDouble() < config.shinyChance) {
+                properties += " shiny=yes";
+            }
+            result.add(properties);
+        }
+        return result.isEmpty() ? roll(state, random) : result;
+    }
+
+    private static void addIfExists(List<String> pool, String properties) {
+        String species = properties.split(" ")[0];
+        if (CobblemonBridge.speciesById(species) != null) {
+            pool.add(properties);
+        }
     }
 
     /**
@@ -97,6 +199,8 @@ public final class Encounters {
         List<Candidate> remaining = new ArrayList<>(pool);
         List<Candidate> picked = new ArrayList<>();
         Set<String> species = new HashSet<>();
+        Set<String> types = new HashSet<>();
+        int rerolls = 0;
         while (picked.size() < count && !remaining.isEmpty()) {
             int total = remaining.stream().mapToInt(c -> Math.max(1, c.weight())).sum();
             int roll = random.nextInt(total);
@@ -109,9 +213,19 @@ public final class Encounters {
                 }
             }
             String chosenSpecies = chosen.species();
+            // Variety: skip a second option of the same main type while others are left.
+            String type = CobblemonBridge.primaryType(chosenSpecies);
+            boolean repeat = type != null && types.contains(type)
+                    && remaining.stream().anyMatch(c -> !type.equals(CobblemonBridge.primaryType(c.species())));
+            if (repeat && rerolls++ < 8) {
+                continue;
+            }
             remaining.removeIf(c -> c.species().equals(chosenSpecies));
             if (species.add(chosenSpecies)) {
                 picked.add(chosen);
+                if (type != null) {
+                    types.add(type);
+                }
             }
         }
         return picked;

@@ -10,7 +10,9 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /** Server config, stored as config/cobbleroguelike.json. */
 public final class RogueConfig {
@@ -94,6 +96,66 @@ public final class RogueConfig {
     /** Chances per route/legendary Pokémon; trainers never get these. */
     public double shinyChance = 1.0 / 256.0;
     public double hiddenAbilityChance = 0.10;
+    /** Route Pokémon come evolved to the stage that fits their level (level evolutions at their level). */
+    public boolean evolveEncounters = true;
+    /** ...stone and trade evolutions from this level, friendship and other methods from otherEvolutionLevel. */
+    public int itemEvolutionLevel = 32;
+    public int otherEvolutionLevel = 30;
+    /**
+     * Rare encounter path card: 3 strong competitive Pokémon to pick from (no legendaries; those
+     * are Legendary cards). Pools use Cobblemon species ids, optionally with a form ("ninetales alolan").
+     */
+    public double metaEncounterChance = 0.08;
+    public int metaEncounterFromBadge = 1;
+    public int metaTopFromBadge = 4;
+    public double metaHiddenAbilityChance = 0.3;
+    /** A-tier competitive picks (from metaEncounterFromBadge). */
+    public List<String> metaPoolStrong = new ArrayList<>(List.of(
+            "arcanine", "arcanine hisuian", "ninetales", "starmie", "alakazam", "gardevoir", "gallade", "togekiss",
+            "sylveon", "jolteon", "espeon", "umbreon", "vaporeon", "hippowdon", "krookodile", "chandelure",
+            "politoed", "ludicolo", "venusaur", "charizard", "blastoise", "swampert", "infernape", "emboar",
+            "serperior", "samurott", "decidueye", "incineroar", "heracross", "pinsir", "scyther", "kleavor",
+            "talonflame", "staraptor", "noivern", "flygon", "altaria", "crobat", "whimsicott", "jellicent",
+            "sableye", "spiritomb", "drapion", "toxicroak", "slowbro", "slowking", "slowbro galarian", "reuniclus",
+            "bronzong", "porygonz", "snorlax", "tauros", "kangaskhan", "medicham", "mawile", "lopunny", "sharpedo",
+            "camerupt", "banette", "absol", "manectric", "houndoom", "aggron", "steelix", "ampharos", "pidgeot",
+            "beedrill", "aerodactyl", "sceptile", "armarouge", "quaquaval", "clodsire", "orthworm", "kilowattrel",
+            "bellibolt", "revavroom", "cyclizar", "houndstone", "rotom", "rotom frost", "rotom mow", "rotom fan",
+            "zoroark", "druddigon", "bisharp", "forretress", "donphan", "hitmontop", "machamp", "toucannon",
+            "lycanroc", "salazzle", "tsareena", "golisopod", "toxtricity", "centiskorch", "drednaw", "coalossal",
+            "barraskewda", "polteageist", "frosmoth", "copperajah", "duraludon", "dracozolt", "dracovish", "falinks",
+            "obstagoon", "runerigus", "grapploct", "mienshao", "scrafty", "galvantula", "eelektross", "crustle",
+            "chesnaught", "delphox", "pangoro", "aurorus", "tyrantrum", "dedenne", "klefki", "trevenant",
+            "gourgeist", "avalugg", "vikavolt", "ribombee", "mudsdale", "araquanid", "lurantis", "bewear",
+            "oranguru", "passimian", "palossand", "turtonator", "togedemaru", "drampa", "dhelmise", "perrserker",
+            "sirfetchd", "cramorant", "indeedee", "morpeko", "dubwool", "pawmot", "maushold", "dachsbun", "arboliva",
+            "garganacl", "scovillain", "tatsugiri", "veluza", "farigiraf", "dudunsparce", "flamigo", "lokix",
+            "brambleghast", "toedscruel", "mabosstiff", "grafaiai", "squawkabilly", "bombirdier", "cetitan", "klawf",
+            "wugtrio"));
+    /** S-tier picks: pseudo-legendaries, Megas, OU staples (from metaTopFromBadge, counted twice). */
+    public List<String> metaPoolTop = new ArrayList<>(List.of(
+            "garchomp", "dragonite", "tyranitar", "metagross", "salamence", "dragapult", "kingambit", "gholdengo",
+            "volcarona", "baxcalibur", "hydreigon", "kommoo", "goodra", "goodra hisuian", "haxorus", "gliscor",
+            "toxapex", "ferrothorn", "corviknight", "skarmory", "scizor", "gengar", "greninja", "aegislash",
+            "mimikyu", "rillaboom", "cinderace", "blaziken", "excadrill", "weavile", "sneasler", "azumarill",
+            "ceruledge", "meowscarada", "annihilape", "palafin", "ursaluna", "rotom wash", "rotom heat",
+            "slowking galarian", "primarina", "clefable", "blissey", "glimmora", "cloyster", "darmanitan",
+            "darmanitan galarian", "typhlosion hisuian", "samurott hisuian", "zoroark hisuian", "archaludon",
+            "hydrapple", "sinistcha", "dondozo", "basculegion", "lucario", "hawlucha", "breloom", "conkeldurr",
+            "magnezone", "tinkaton", "skeledirge", "dragalge", "hatterene", "grimmsnarl", "torterra", "mamoswine",
+            "kingdra", "gyarados", "alomomola", "quagsire", "chansey", "porygon2", "amoonguss", "ninetales alolan",
+            "pelipper", "torkoal", "espathra"));
+    /** Paradox Pokémon, the strongest non-legendaries (from metaEliteFromBadge). */
+    public int metaEliteFromBadge = 6;
+    public List<String> metaPoolElite = new ArrayList<>(List.of(
+            "greattusk", "ironvaliant", "fluttermane", "ironmoth", "roaringmoon", "ironbundle", "ironhands",
+            "walkingwake", "ironleaves", "gougingfire", "ragingbolt", "ironboulder", "ironcrown", "sandyshocks",
+            "screamtail", "brutebonnet", "slitherwing", "irontreads", "ironjugulis", "ironthorns"));
+
+    /** Chance that one of a route's options wanders in from another biome, for variety. */
+    public double wanderingChance = 0.2;
+    /** Each badge makes rare route spawns more common (0.075 = rare/common odds flatten 7.5% per badge, max 60%). */
+    public double encounterRarityPerBadge = 0.075;
 
     /** A Legendary card is guaranteed on the first floor after earning each of these badge counts. */
     public List<Integer> legendaryAfterBadges = new ArrayList<>(List.of(3, 6));
@@ -158,58 +220,60 @@ public final class RogueConfig {
                     new ShopEntry("cobblemon:max_ether", 1000),
                     new ShopEntry("cobblemon:elixir", 1500),
                     new ShopEntry("cobblemon:max_elixir", 2500))),
+            // Priced by how strong they are in competitive play: top picks 6000, staples 4000,
+            // niche 2500, weak 1200.
             new ShopCategory("Battle Items", "cobblemon:life_orb", "hold", List.of(
-                    new ShopEntry("cobblemon:leftovers", 3000),
-                    new ShopEntry("cobblemon:life_orb", 4000),
-                    new ShopEntry("cobblemon:choice_band", 4000),
-                    new ShopEntry("cobblemon:choice_specs", 4000),
-                    new ShopEntry("cobblemon:choice_scarf", 4000),
-                    new ShopEntry("cobblemon:focus_sash", 2500),
-                    new ShopEntry("cobblemon:assault_vest", 3500),
-                    new ShopEntry("cobblemon:rocky_helmet", 2500),
-                    new ShopEntry("cobblemon:heavy_duty_boots", 2500),
-                    new ShopEntry("cobblemon:eviolite", 3000),
-                    new ShopEntry("cobblemon:expert_belt", 2500),
-                    new ShopEntry("cobblemon:weakness_policy", 2500),
-                    new ShopEntry("cobblemon:black_sludge", 2000),
-                    new ShopEntry("cobblemon:air_balloon", 1500),
-                    new ShopEntry("cobblemon:light_clay", 2000),
-                    new ShopEntry("cobblemon:muscle_band", 2000),
-                    new ShopEntry("cobblemon:wise_glasses", 2000),
-                    new ShopEntry("cobblemon:scope_lens", 2000),
-                    new ShopEntry("cobblemon:quick_claw", 1500),
-                    new ShopEntry("cobblemon:shell_bell", 2000),
-                    new ShopEntry("cobblemon:eject_button", 1500),
-                    new ShopEntry("cobblemon:eject_pack", 1500),
-                    new ShopEntry("cobblemon:red_card", 1500),
-                    new ShopEntry("cobblemon:white_herb", 1500),
-                    new ShopEntry("cobblemon:mental_herb", 1500),
-                    new ShopEntry("cobblemon:power_herb", 1500),
-                    new ShopEntry("cobblemon:safety_goggles", 1500),
-                    new ShopEntry("cobblemon:protective_pads", 1500),
-                    new ShopEntry("cobblemon:loaded_dice", 2000),
-                    new ShopEntry("cobblemon:clear_amulet", 2000),
-                    new ShopEntry("cobblemon:covert_cloak", 2000),
-                    new ShopEntry("cobblemon:throat_spray", 1500),
-                    new ShopEntry("cobblemon:blunder_policy", 1500),
-                    new ShopEntry("cobblemon:flame_orb", 1500),
-                    new ShopEntry("cobblemon:toxic_orb", 1500),
-                    new ShopEntry("cobblemon:zoom_lens", 1500),
-                    new ShopEntry("cobblemon:wide_lens", 1500),
-                    new ShopEntry("cobblemon:focus_band", 1500),
-                    new ShopEntry("cobblemon:bright_powder", 1500),
-                    new ShopEntry("cobblemon:ability_shield", 2000),
-                    new ShopEntry("cobblemon:utility_umbrella", 1500),
-                    new ShopEntry("cobblemon:terrain_extender", 1500),
-                    new ShopEntry("cobblemon:heat_rock", 1000),
-                    new ShopEntry("cobblemon:damp_rock", 1000),
-                    new ShopEntry("cobblemon:smooth_rock", 1000),
-                    new ShopEntry("cobblemon:icy_rock", 1000),
-                    new ShopEntry("cobblemon:mirror_herb", 1500),
-                    new ShopEntry("cobblemon:punching_glove", 1500),
-                    new ShopEntry("cobblemon:shed_shell", 1000),
-                    new ShopEntry("cobblemon:big_root", 1000),
-                    new ShopEntry("cobblemon:iron_ball", 1000))),
+                    new ShopEntry("cobblemon:leftovers", 6000),
+                    new ShopEntry("cobblemon:life_orb", 6000),
+                    new ShopEntry("cobblemon:choice_band", 6000),
+                    new ShopEntry("cobblemon:choice_specs", 6000),
+                    new ShopEntry("cobblemon:choice_scarf", 6000),
+                    new ShopEntry("cobblemon:focus_sash", 6000),
+                    new ShopEntry("cobblemon:assault_vest", 6000),
+                    new ShopEntry("cobblemon:rocky_helmet", 4000),
+                    new ShopEntry("cobblemon:heavy_duty_boots", 4000),
+                    new ShopEntry("cobblemon:eviolite", 6000),
+                    new ShopEntry("cobblemon:expert_belt", 4000),
+                    new ShopEntry("cobblemon:weakness_policy", 4000),
+                    new ShopEntry("cobblemon:black_sludge", 4000),
+                    new ShopEntry("cobblemon:air_balloon", 2500),
+                    new ShopEntry("cobblemon:light_clay", 4000),
+                    new ShopEntry("cobblemon:muscle_band", 2500),
+                    new ShopEntry("cobblemon:wise_glasses", 2500),
+                    new ShopEntry("cobblemon:scope_lens", 2500),
+                    new ShopEntry("cobblemon:quick_claw", 1200),
+                    new ShopEntry("cobblemon:shell_bell", 2500),
+                    new ShopEntry("cobblemon:eject_button", 2500),
+                    new ShopEntry("cobblemon:eject_pack", 2500),
+                    new ShopEntry("cobblemon:red_card", 2500),
+                    new ShopEntry("cobblemon:white_herb", 2500),
+                    new ShopEntry("cobblemon:mental_herb", 2500),
+                    new ShopEntry("cobblemon:power_herb", 2500),
+                    new ShopEntry("cobblemon:safety_goggles", 2500),
+                    new ShopEntry("cobblemon:protective_pads", 2500),
+                    new ShopEntry("cobblemon:loaded_dice", 4000),
+                    new ShopEntry("cobblemon:clear_amulet", 4000),
+                    new ShopEntry("cobblemon:covert_cloak", 4000),
+                    new ShopEntry("cobblemon:throat_spray", 2500),
+                    new ShopEntry("cobblemon:blunder_policy", 2500),
+                    new ShopEntry("cobblemon:flame_orb", 2500),
+                    new ShopEntry("cobblemon:toxic_orb", 2500),
+                    new ShopEntry("cobblemon:zoom_lens", 1200),
+                    new ShopEntry("cobblemon:wide_lens", 1200),
+                    new ShopEntry("cobblemon:focus_band", 1200),
+                    new ShopEntry("cobblemon:bright_powder", 1200),
+                    new ShopEntry("cobblemon:ability_shield", 2500),
+                    new ShopEntry("cobblemon:utility_umbrella", 2500),
+                    new ShopEntry("cobblemon:terrain_extender", 2500),
+                    new ShopEntry("cobblemon:heat_rock", 2500),
+                    new ShopEntry("cobblemon:damp_rock", 2500),
+                    new ShopEntry("cobblemon:smooth_rock", 2500),
+                    new ShopEntry("cobblemon:icy_rock", 2500),
+                    new ShopEntry("cobblemon:mirror_herb", 2500),
+                    new ShopEntry("cobblemon:punching_glove", 2500),
+                    new ShopEntry("cobblemon:shed_shell", 1200),
+                    new ShopEntry("cobblemon:big_root", 1200),
+                    new ShopEntry("cobblemon:iron_ball", 1200))),
             new ShopCategory("Type Boosters", "cobblemon:charcoal_stick", "hold", List.of(
                     new ShopEntry("cobblemon:silk_scarf", 1500),
                     new ShopEntry("cobblemon:charcoal_stick", 1500),
@@ -230,8 +294,8 @@ public final class RogueConfig {
                     new ShopEntry("cobblemon:metal_coat", 1500),
                     new ShopEntry("cobblemon:fairy_feather", 1500))),
             new ShopCategory("Berries", "cobblemon:sitrus_berry", "hold", List.of(
-                    new ShopEntry("cobblemon:sitrus_berry", 600),
-                    new ShopEntry("cobblemon:lum_berry", 600),
+                    new ShopEntry("cobblemon:sitrus_berry", 1000),
+                    new ShopEntry("cobblemon:lum_berry", 1200),
                     new ShopEntry("cobblemon:oran_berry", 200),
                     new ShopEntry("cobblemon:leppa_berry", 400),
                     new ShopEntry("cobblemon:chesto_berry", 300),
@@ -304,10 +368,34 @@ public final class RogueConfig {
     /** Mega Showdown integration (only used when the mod is installed). */
     public boolean megaShowdownShop = true;
     public int gimmickUnlockPrice = 5000;
-    public int megaStonePrice = 3000;
+    /** Mega Stones not listed in {@link #megaStonePrices}. */
+    public int megaStonePrice = 5000;
+    /**
+     * Mega Stone prices by item path, by how strong the Mega is: top-tier Megas (Mega Metagross,
+     * Gengar, Kangaskhan, Salamence, Mewtwo...) 12000, solid ones 8000, the rest megaStonePrice.
+     */
+    public Map<String, Integer> megaStonePrices = defaultMegaStonePrices();
     public int zCrystalPrice = 2500;
     /** Per shard; Mega Showdown needs several shards (its teraShardRequired config) to change a Tera type. */
     public int teraShardPrice = 100;
+
+    private static Map<String, Integer> defaultMegaStonePrices() {
+        Map<String, Integer> prices = new LinkedHashMap<>();
+        for (String stone : List.of("mewtwonite_x", "mewtwonite_y", "salamencite", "metagrossite", "gengarite",
+                "kangaskhanite", "lucarionite", "mawilite", "medichamite", "lopunnite", "garchompite",
+                "gardevoirite", "alakazite", "scizorite", "charizardite_x", "charizardite_y", "diancite",
+                "latiasite", "latiosite", "tyranitarite", "swampertite", "blazikenite", "pinsirite")) {
+            prices.put(stone, 12000);
+        }
+        for (String stone : List.of("aerodactylite", "altarianite", "ampharosite", "venusaurite", "blastoisinite",
+                "gyaradosite", "heracronite", "houndoominite", "manectite", "pidgeotite", "sablenite",
+                "sceptilite", "slowbronite", "steelixite", "glalitite", "audinite", "absolite", "galladite",
+                "aggronite", "cameruptite", "sharpedonite", "banettite", "beedrillite", "abomasite",
+                "dragoninite", "excadrite", "greninjite", "clefablite", "froslassite")) {
+            prices.put(stone, 8000);
+        }
+        return prices;
+    }
 
     public static final class ShopCategory {
         public String name;
@@ -383,6 +471,9 @@ public final class RogueConfig {
     /** Draft a counter: only in runs with the Counter Draft modifier. */
     public boolean prepDraft = true;
     public boolean prepHeal = true;
+    /** Boss prep heal: free before the first gym, then this many coins (+ per badge). */
+    public int prepHealPrice = 2000;
+    public int prepHealPricePerBadge = 750;
     public int prepDraftOptions = 3;
 
     // ---------------------------------------------------------------- boss archetypes
@@ -518,6 +609,10 @@ public final class RogueConfig {
         return instance;
     }
 
+    /** Bump when the default shop prices change; older configs get the new catalog once. */
+    private static final int SHOP_VERSION = 2;
+    public int shopVersion = 0;
+
     public static void load() {
         Path path = FabricLoader.getInstance().getConfigDir().resolve(Cobbleroguelike.MOD_ID + ".json");
         if (Files.exists(path)) {
@@ -529,6 +624,16 @@ public final class RogueConfig {
             } catch (IOException | RuntimeException e) {
                 Cobbleroguelike.LOGGER.error("Failed to read {}, using defaults", path, e);
             }
+        }
+        if (instance.shopVersion < SHOP_VERSION) {
+            if (Files.exists(path)) {
+                Cobbleroguelike.LOGGER.info("Updating the run shop catalog and Mega Stone prices to the new defaults");
+            }
+            RogueConfig defaults = new RogueConfig();
+            instance.shop = defaults.shop;
+            instance.megaStonePrice = defaults.megaStonePrice;
+            instance.megaStonePrices = defaults.megaStonePrices;
+            instance.shopVersion = SHOP_VERSION;
         }
         try (Writer writer = Files.newBufferedWriter(path)) {
             GSON.toJson(instance, writer);
