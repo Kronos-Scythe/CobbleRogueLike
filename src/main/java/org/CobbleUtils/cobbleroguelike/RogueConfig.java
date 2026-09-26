@@ -331,6 +331,25 @@ public final class RogueConfig {
     /** With "bosses", the chance that a normal trainer also battles in doubles. */
     public double doubleTrainerChance = 0.2;
 
+    // ---------------------------------------------------------------- Elite Four
+
+    /** Elite Four members to beat (after all badges) before the Champion appears. 0 skips them. */
+    public int eliteCount = 4;
+    /** Floors between Elite Four battles (1 = back to back). */
+    public int eliteEvery = 2;
+    public int eliteTeamSize = 5;
+    public double eliteRewardMultiplier = 5.0;
+    public boolean healAfterElite = false;
+
+    // ---------------------------------------------------------------- boss gimmicks (Mega Showdown)
+
+    /** Gym leaders, the Elite Four and the Champion Mega Evolve or Terastallize (needs Mega Showdown). */
+    public boolean bossGimmicks = true;
+    /** Gyms use Tera from this many badges on... */
+    public int bossTeraFromBadge = 1;
+    /** ...and Mega Evolution (when a team member can) from this many badges on. */
+    public int bossMegaFromBadge = 3;
+
     // ---------------------------------------------------------------- move tutor
 
     /** Coins to teach a TM/tutor/egg move. Level-up moves the Pokémon already qualifies for are free. */

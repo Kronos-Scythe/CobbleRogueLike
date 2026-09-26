@@ -150,6 +150,13 @@ public final class RogueMenus {
                                 Text.literal(bossDoubles() ? "Double battle, competitive sets." : "Competitive sets.").formatted(Formatting.YELLOW),
                                 Text.literal("Losing ends the run!").formatted(Formatting.RED))),
                         p -> RunManager.get().chooseNode(p, index));
+                case ELITE -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:amethyst_block",
+                        Text.literal("Elite Four").formatted(Formatting.DARK_PURPLE, Formatting.BOLD), List.of(
+                                Text.literal("Member " + (state.eliteWins + 1) + " of " + RogueConfig.get().eliteCount + "."),
+                                Text.literal("Around Lv. " + Scaling.eliteLevel(state) + ", full competitive team."),
+                                Text.literal(bossDoubles() ? "Double battle." : "Single battle.").formatted(Formatting.YELLOW),
+                                Text.literal("Losing ends the run!").formatted(Formatting.RED))),
+                        p -> RunManager.get().chooseNode(p, index));
                 case CHAMPION -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:dragon_head",
                         Text.literal("The Champion").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), List.of(
                                 Text.literal("The final battle, Lv. " + Scaling.levelCap(state.badges) + "."),
@@ -172,6 +179,7 @@ public final class RogueMenus {
         Menu menu = new Menu(Text.literal(state.battleName));
         String icon = switch (state.battleKind) {
             case GYM -> "minecraft:gold_block";
+            case ELITE -> "minecraft:amethyst_block";
             case CHAMPION -> "minecraft:dragon_head";
             case LEGENDARY -> "minecraft:nether_star";
             default -> "minecraft:iron_sword";
@@ -187,6 +195,11 @@ public final class RogueMenus {
         }
         if (state.battleDoubles) {
             lore.add(Text.literal("Double Battle!").formatted(Formatting.AQUA, Formatting.BOLD));
+        }
+        if (state.battleGimmick.equals("mega")) {
+            lore.add(Text.literal("Their ace can Mega Evolve!").formatted(Formatting.LIGHT_PURPLE));
+        } else if (state.battleGimmick.equals("tera")) {
+            lore.add(Text.literal("Their ace can Terastallize!").formatted(Formatting.LIGHT_PURPLE));
         }
         if (legendary) {
             lore.add(Text.literal(describeProperties(state.battleTeam.get(0))).formatted(Formatting.LIGHT_PURPLE));
@@ -262,7 +275,9 @@ public final class RogueMenus {
 
     private static void addControls(Menu menu, RunState state) {
         menu.icon(18, Menu.stack("minecraft:map", Text.literal("Floor " + state.floor).formatted(Formatting.WHITE), List.of(
-                Text.literal("Badges: " + state.badges + "/" + RogueConfig.get().gymCount),
+                Text.literal("Badges: " + state.badges + "/" + RogueConfig.get().gymCount
+                        + (Scaling.championUnlocked(state.badges) && RogueConfig.get().eliteCount > 0
+                        ? "  Elite Four: " + state.eliteWins + "/" + RogueConfig.get().eliteCount : "")),
                 Text.literal("Biome: " + Biomes.get(state.biome).name).formatted(Formatting.AQUA),
                 Text.literal("Level cap: " + Scaling.levelCap(state.badges)),
                 Text.literal("Coins: " + state.money).formatted(Formatting.GOLD))));

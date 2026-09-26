@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import org.CobbleUtils.cobbleroguelike.command.RogueCommand;
 import org.CobbleUtils.cobbleroguelike.compat.RunEntities;
+import org.CobbleUtils.cobbleroguelike.compat.MegaData;
 import org.CobbleUtils.cobbleroguelike.compat.SpawnData;
 import org.CobbleUtils.cobbleroguelike.guard.RogueGuards;
 import org.CobbleUtils.cobbleroguelike.run.RunManager;
@@ -32,6 +33,7 @@ public class Cobbleroguelike implements ModInitializer {
         RogueGuards.register();
         RunEntities.register();
         SpawnData.register();
+        MegaData.register();
         Scheduler.register();
     }
 }

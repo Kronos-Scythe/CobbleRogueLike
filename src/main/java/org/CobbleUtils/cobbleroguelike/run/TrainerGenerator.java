@@ -2,12 +2,15 @@ package org.CobbleUtils.cobbleroguelike.run;
 
 import org.CobbleUtils.cobbleroguelike.RogueConfig;
 import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
+import org.CobbleUtils.cobbleroguelike.compat.MegaData;
+import org.CobbleUtils.cobbleroguelike.shop.ShopCatalog;
 import org.CobbleUtils.cobbleroguelike.compat.TeamBuilder;
 import org.CobbleUtils.cobbleroguelike.run.RunState.NodeType;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Random;
 import java.util.Set;
@@ -30,7 +33,7 @@ public final class TrainerGenerator {
         state.clearBattle();
         state.battleKind = kind;
         String name = NAMES[random.nextInt(NAMES.length)];
-        boolean boss = kind == NodeType.GYM || kind == NodeType.CHAMPION;
+        boolean boss = kind == NodeType.GYM || kind == NodeType.ELITE || kind == NodeType.CHAMPION;
         boolean doubles = switch (config.doubleBattles.toLowerCase(Locale.ROOT)) {
             case "all" -> true;
             case "none" -> false;
@@ -44,6 +47,14 @@ public final class TrainerGenerator {
                 state.battleName = "Gym Leader " + name + " (" + capitalize(type) + ")";
                 state.battleSkill = Math.min(5, 2 + state.badges / 2);
                 state.battleTeam = buildTeam(type, teamSize(config.gymTeamSizes, state.badges), cap, true, false, random);
+            }
+            case ELITE -> {
+                String type = pickEliteType(state, random);
+                int level = Scaling.eliteLevel(state);
+                state.battleType = type;
+                state.battleName = "Elite Four " + name + " (" + capitalize(type) + ")";
+                state.battleSkill = 5;
+                state.battleTeam = buildTeam(type, Math.max(1, Math.min(6, config.eliteTeamSize)), level, true, false, random);
             }
             case CHAMPION -> {
                 int cap = Scaling.levelCap(state.badges);
@@ -75,6 +86,102 @@ public final class TrainerGenerator {
         }
         state.battleDoubles = doubles && state.battleTeam.size() >= 2;
         state.battleTeam = strengthen(state, state.battleDoubles, random);
+        applyGimmick(state, random);
+    }
+
+    /**
+     * With Mega Showdown installed, bosses get a gimmick for their ace. It is Mega Evolution if a
+     * suitable Mega-capable Pokémon can lead the team (a gym's or Elite's ace must share its type),
+     * otherwise Terastallization into the gym/Elite type (or the ace's own type for the Champion).
+     */
+    private static void applyGimmick(RunState state, Random random) {
+        RogueConfig config = RogueConfig.get();
+        boolean boss = state.battleKind == NodeType.GYM || state.battleKind == NodeType.ELITE
+                || state.battleKind == NodeType.CHAMPION;
+        if (!boss || !config.bossGimmicks || !ShopCatalog.megaShowdownLoaded() || state.battleTeam.isEmpty()) {
+            return;
+        }
+        boolean lateBoss = state.battleKind != NodeType.GYM;
+        int aceIndex = state.battleTeam.size() - 1;
+        String ace = state.battleTeam.get(aceIndex);
+
+        if (lateBoss || state.badges >= config.bossMegaFromBadge) {
+            Map<String, List<String>> stones = MegaData.stonesBySpecies();
+            // Prefer a team member that can already Mega Evolve; make it the ace.
+            for (int i = aceIndex; i >= 0 && !stones.isEmpty(); i--) {
+                String species = speciesOf(state.battleTeam.get(i));
+                if (stones.containsKey(species)) {
+                    String member = state.battleTeam.remove(i);
+                    List<String> options = stones.get(species);
+                    state.battleTeam.add(withToken(member, "held_item", options.get(random.nextInt(options.size()))));
+                    state.battleGimmick = "mega";
+                    return;
+                }
+            }
+            // Otherwise bring in a fitting Mega-capable ace (same type for gyms and Elites).
+            List<String> candidates = new ArrayList<>();
+            for (String species : stones.keySet()) {
+                if (state.battleType.isEmpty() || CobblemonBridge.speciesHasType(species, state.battleType)) {
+                    candidates.add(species);
+                }
+            }
+            if (!candidates.isEmpty()) {
+                candidates.sort(String::compareTo);
+                String species = candidates.get(random.nextInt(candidates.size()));
+                int level = levelOf(ace);
+                Set<String> usedItems = new HashSet<>();
+                String built = TeamBuilder.build(species + " level=" + level, 2, state.battleDoubles, false, usedItems, random);
+                List<String> options = stones.get(species);
+                state.battleTeam.set(aceIndex, withToken(built, "held_item", options.get(random.nextInt(options.size()))));
+                state.battleGimmick = "mega";
+                return;
+            }
+        }
+        if (lateBoss || state.badges >= config.bossTeraFromBadge) {
+            String teraType = !state.battleType.isEmpty() ? state.battleType : CobblemonBridge.primaryType(speciesOf(ace));
+            if (teraType != null) {
+                state.battleTeam.set(aceIndex, withToken(ace, "tera_type", teraType));
+                state.battleGimmick = "tera";
+            }
+        }
+    }
+
+    /** Species id at the start of a property string. */
+    public static String speciesOf(String properties) {
+        return properties.split(" ")[0];
+    }
+
+    private static int levelOf(String properties) {
+        for (String part : properties.split(" ")) {
+            if (part.startsWith("level=")) {
+                try {
+                    return Integer.parseInt(part.substring(6));
+                } catch (NumberFormatException ignored) {
+                    return 50;
+                }
+            }
+        }
+        return 50;
+    }
+
+    /** Replaces (or adds) a {@code key=value} token in a property string. */
+    private static String withToken(String properties, String key, String value) {
+        StringBuilder result = new StringBuilder();
+        for (String part : properties.split(" ")) {
+            if (!part.startsWith(key + "=")) {
+                result.append(result.length() == 0 ? "" : " ").append(part);
+            }
+        }
+        return result + " " + key + "=" + value;
+    }
+
+    private static String pickEliteType(RunState state, Random random) {
+        List<String> types = new ArrayList<>(CobblemonBridge.typeNames());
+        types.removeAll(state.usedEliteTypes);
+        if (types.isEmpty()) {
+            types = CobblemonBridge.typeNames();
+        }
+        return types.get(random.nextInt(types.size()));
     }
 
     /**
@@ -95,7 +202,7 @@ public final class TrainerGenerator {
                 tier = state.badges == 0 ? 0 : state.badges < 4 ? 1 : 2;
                 itemsForAll = tier >= 1;
             }
-            case CHAMPION -> {
+            case ELITE, CHAMPION -> {
                 tier = 2;
                 itemsForAll = true;
             }

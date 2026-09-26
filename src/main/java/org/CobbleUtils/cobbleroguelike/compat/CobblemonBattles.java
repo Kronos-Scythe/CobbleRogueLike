@@ -2,6 +2,7 @@ package org.CobbleUtils.cobbleroguelike.compat;
 
 import com.cobblemon.mod.common.api.battles.model.PokemonBattle;
 import com.cobblemon.mod.common.api.battles.model.actor.BattleActor;
+import com.cobblemon.mod.common.api.battles.model.ai.BattleAI;
 import com.cobblemon.mod.common.battles.BattleFormat;
 import com.cobblemon.mod.common.battles.BattleRegistry;
 import com.cobblemon.mod.common.battles.BattleRules;
@@ -17,6 +18,8 @@ import com.cobblemon.mod.common.entity.npc.NPCEntity;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import kotlin.Unit;
+import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import org.CobbleUtils.cobbleroguelike.util.Scheduler;
@@ -46,7 +49,8 @@ public final class CobblemonBattles {
      * @return the battle, or null if it could not start
      */
     public static PokemonBattle startTrainerBattle(ServerPlayerEntity player, String trainerName,
-                                                   List<Pokemon> trainerTeam, int aiSkill, boolean doubles) {
+                                                   List<Pokemon> trainerTeam, int aiSkill, boolean doubles,
+                                                   String gimmick) {
         List<BattlePokemon> playerTeam = new ArrayList<>(CobblemonBridge.party(player).toBattleTeam(false, false, null));
         playerTeam.sort(Comparator.comparing(pokemon -> pokemon.getHealth() <= 0));
         if (playerTeam.isEmpty() || playerTeam.get(0).getHealth() <= 0 || trainerTeam.isEmpty()) {
@@ -66,7 +70,17 @@ public final class CobblemonBattles {
             return null;
         }
         int skill = Math.max(0, Math.min(5, aiSkill));
-        NPCBattleActor trainer = new NPCBattleActor(npc, team, skill, new StrongBattleAI(skill));
+        BattleAI ai = new StrongBattleAI(skill);
+        if (gimmick != null && !gimmick.isEmpty() && !trainerTeam.isEmpty()) {
+            Pokemon ace = trainerTeam.get(trainerTeam.size() - 1);
+            ai = new GimmickAI(ai, gimmick, CobblemonBridge.propertyId(ace.getSpecies()));
+            // Purely visual: the leader shows off the key item.
+            ItemStack keyItem = ItemBridge.stack(gimmick.equals("mega") ? "mega_showdown:mega_bracelet" : "mega_showdown:tera_orb");
+            if (!keyItem.isEmpty()) {
+                npc.equipStack(EquipmentSlot.MAINHAND, keyItem);
+            }
+        }
+        NPCBattleActor trainer = new NPCBattleActor(npc, team, skill, ai);
 
         BattleFormat format = withBagClause(doubles ? BattleFormat.Companion.getGEN_9_DOUBLES() : BattleFormat.Companion.getGEN_9_SINGLES());
 

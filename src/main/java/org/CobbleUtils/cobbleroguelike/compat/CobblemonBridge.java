@@ -122,6 +122,17 @@ public final class CobblemonBridge {
         return id.getNamespace().equals("cobblemon") ? id.getPath() : id.toString();
     }
 
+    public static boolean speciesHasType(String speciesId, String typeName) {
+        Species species = speciesById(speciesId);
+        return species != null && hasType(species, typeName);
+    }
+
+    /** Lowercase primary type name of a species, or null. */
+    public static String primaryType(String speciesId) {
+        Species species = speciesById(speciesId);
+        return species == null ? null : species.getPrimaryType().getName().toLowerCase(java.util.Locale.ROOT);
+    }
+
     /** Legendary-encounter candidates up to a base stat total. */
     public static List<String> legendaryPool(int maxBst, boolean allowRestricted, boolean includeUltraBeasts, boolean includeParadox) {
         List<String> result = new ArrayList<>();

@@ -47,7 +47,8 @@ The whole run is played through server-side chest menus (`/rogue`). There's no d
       │  Trainer    : generated AI trainer battle                       │
       │  Shop & Bag : always available from every run menu              │
       │  ► Gym every 5th floor: random type, ace at the cap; badge      │
-      │  ► After 8 badges: the Champion. Beat them to win the run       │
+      │  ► After 8 badges: 4 Elite Four fights (every 2nd floor), then  │
+      │    the Champion. Beat them to win the run                        │
       └─────────────────────────────────────────────────────────────────┘
 Whiteout / win / "End run" ─► rewards ─► real party restored
 ```
@@ -92,6 +93,18 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
   - Gyms 2–4: adds TM, tutor and egg moves, items for everyone, natures and perfect IVs.
   - Gym 5 and later, and the Champion: adds full EV spreads.
   - Normal trainers get the best level-up movesets, and their ace holds an item from 4 badges on.
+
+### Elite Four and boss gimmicks
+
+- **Elite Four:** after the last badge, a boss floor comes every `eliteEvery` (2) floors: `eliteCount` (4) Elite Four members, then the Champion.
+  - Each member has a unique type, `eliteTeamSize` (5) Pokémon at levels ramping from the last gym's cap to the Champion's, and full tier-2 sets.
+  - Rewards are ×5, and there's no free heal unless `healAfterElite` is on.
+- **Boss gimmicks** (Mega Showdown installed, `bossGimmicks`):
+  - **Mega Evolution:** gyms from `bossMegaFromBadge` (3), plus the Elite Four and the Champion. A team member with a mega stone becomes the ace. Otherwise a Mega-capable species of the gym's type is brought in as the ace.
+  - Stone ↔ species comes from Mega Showdown's datapack (`mega_showdown/mega/*.json`).
+  - **Terastallization:** used instead when no Mega fits, from `bossTeraFromBadge` (1). The ace Teras into the gym or Elite type (or its own type for the Champion).
+  - Cobblemon only filters gimmicks for players, so for NPCs Showdown offers them automatically. `GimmickAI` wraps `StrongBattleAI`, which never picks gimmicks itself, and selects Mega or Tera when the ace is active.
+  - The NPC holds a Mega Bracelet or Tera Orb as a visual tell, and the battle preview warns about the gimmick.
 
 ### Move Tutor
 

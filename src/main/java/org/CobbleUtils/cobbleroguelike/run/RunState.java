@@ -18,7 +18,7 @@ public final class RunState {
 
     public enum Phase { CHOOSE_NODE, ENCOUNTER, RELEASE, BATTLE }
 
-    public enum NodeType { ROUTE, REST, TRAINER, GYM, CHAMPION, LEGENDARY }
+    public enum NodeType { ROUTE, REST, TRAINER, GYM, ELITE, CHAMPION, LEGENDARY }
 
     public final UUID playerId;
     public final long seed;
@@ -37,6 +37,10 @@ public final class RunState {
     public List<String> usedBiomes = new ArrayList<>();
     /** Badge count whose guaranteed Legendary card was already offered (-1 = none yet). */
     public int legendaryOfferedAt = -1;
+    /** Elite Four members beaten, and the floor where the Elite Four stretch began (-1 = not yet). */
+    public int eliteWins = 0;
+    public int eliteStartFloor = -1;
+    public List<String> usedEliteTypes = new ArrayList<>();
     public List<NodeType> nodeChoices = new ArrayList<>();
     /** Property strings, e.g. {@code "zubat level=7"}. */
     public List<String> encounterOptions = new ArrayList<>();
@@ -51,6 +55,8 @@ public final class RunState {
     public List<String> battleTeam = new ArrayList<>();
     public int battleSkill = 0;
     public boolean battleDoubles = false;
+    /** Gimmick the boss will use ("mega", "tera" or empty; Mega Showdown only). */
+    public String battleGimmick = "";
 
     public RunState(UUID playerId, long seed) {
         this.playerId = playerId;
@@ -86,6 +92,7 @@ public final class RunState {
         battleTeam = new ArrayList<>();
         battleSkill = 0;
         battleDoubles = false;
+        battleGimmick = "";
     }
 
     public NbtCompound toNbt() {
@@ -104,6 +111,9 @@ public final class RunState {
         tag.putString("biome", biome);
         tag.put("usedBiomes", writeStrings(usedBiomes));
         tag.putInt("legendaryOfferedAt", legendaryOfferedAt);
+        tag.putInt("eliteWins", eliteWins);
+        tag.putInt("eliteStartFloor", eliteStartFloor);
+        tag.put("usedEliteTypes", writeStrings(usedEliteTypes));
         tag.put("nodeChoices", writeStrings(nodeChoices.stream().map(Enum::name).toList()));
         tag.put("encounterOptions", writeStrings(encounterOptions));
         tag.putString("pendingEncounter", pendingEncounter);
@@ -113,6 +123,7 @@ public final class RunState {
         tag.put("battleTeam", writeStrings(battleTeam));
         tag.putInt("battleSkill", battleSkill);
         tag.putBoolean("battleDoubles", battleDoubles);
+        tag.putString("battleGimmick", battleGimmick);
         return tag;
     }
 
@@ -135,6 +146,9 @@ public final class RunState {
         state.biome = tag.getString("biome");
         state.usedBiomes = readStrings(tag, "usedBiomes");
         state.legendaryOfferedAt = tag.contains("legendaryOfferedAt") ? tag.getInt("legendaryOfferedAt") : -1;
+        state.eliteWins = tag.getInt("eliteWins");
+        state.eliteStartFloor = tag.contains("eliteStartFloor") ? tag.getInt("eliteStartFloor") : -1;
+        state.usedEliteTypes = readStrings(tag, "usedEliteTypes");
         for (String node : readStrings(tag, "nodeChoices")) {
             NodeType type = parse(NodeType.class, node, null);
             if (type != null) {
@@ -149,6 +163,7 @@ public final class RunState {
         state.battleTeam = readStrings(tag, "battleTeam");
         state.battleSkill = tag.getInt("battleSkill");
         state.battleDoubles = tag.getBoolean("battleDoubles");
+        state.battleGimmick = tag.getString("battleGimmick");
         return state;
     }
 

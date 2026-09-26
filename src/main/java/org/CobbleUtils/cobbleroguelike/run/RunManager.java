@@ -120,6 +120,9 @@ public final class RunManager {
 
     /** Fixes up states loaded from older builds so the menus always have something to show. */
     private void repair(RunState state) {
+        if (Scaling.championUnlocked(state.badges) && state.eliteStartFloor < 0) {
+            state.eliteStartFloor = Math.max(0, state.floor - 1); // runs from before the Elite Four existed
+        }
         if (state.biome.isEmpty()) {
             state.biome = Biomes.roll(state, rng(state, 5));
         }
@@ -453,7 +456,7 @@ public final class RunManager {
                 message(player, "Your team rested and is fully healed.", Formatting.GREEN);
                 advanceFloor(state);
             }
-            case TRAINER, GYM, CHAMPION, LEGENDARY -> {
+            case TRAINER, GYM, ELITE, CHAMPION, LEGENDARY -> {
                 TrainerGenerator.prepare(state, state.nodeChoices.get(index), rng(state, 10 + index));
                 state.phase = Phase.BATTLE;
             }
@@ -483,7 +486,7 @@ public final class RunManager {
         }
         PokemonBattle battle = state.battleKind == NodeType.LEGENDARY
                 ? CobblemonBattles.startWildBattle(player, state.battleTeam.get(0), state.battleSkill)
-                : CobblemonBattles.startTrainerBattle(player, state.battleName, team, state.battleSkill, doubles);
+                : CobblemonBattles.startTrainerBattle(player, state.battleName, team, state.battleSkill, doubles, state.battleGimmick);
         if (battle == null) {
             message(player, "The battle couldn't start. Is your lead Pokémon able to fight?", Formatting.RED);
             return;
@@ -536,6 +539,22 @@ public final class RunManager {
                 }
                 state.biome = Biomes.roll(state, rng(state, 5));
                 message(player, "You travel on to the " + Biomes.get(state.biome).name + ".", Formatting.AQUA);
+                if (Scaling.championUnlocked(state.badges)) {
+                    state.eliteStartFloor = state.floor;
+                    message(player, RogueConfig.get().eliteCount > 0
+                            ? "All badges earned! The Elite Four awaits." : "All badges earned! The Champion awaits.", Formatting.LIGHT_PURPLE);
+                }
+            }
+            case ELITE -> {
+                state.eliteWins++;
+                state.usedEliteTypes.add(state.battleType);
+                int remaining = Math.max(0, RogueConfig.get().eliteCount - state.eliteWins);
+                message(player, "You defeated " + state.battleName + "! " + (remaining > 0
+                        ? remaining + " Elite Four member" + (remaining == 1 ? "" : "s") + " left."
+                        : "The Champion awaits!"), Formatting.GOLD);
+                if (RogueConfig.get().healAfterElite) {
+                    CobblemonBridge.healParty(player);
+                }
             }
             case LEGENDARY -> {
                 String recruit = state.battleTeam.get(0);
@@ -700,6 +719,7 @@ public final class RunManager {
         }
         double multiplier = switch (state.battleKind) {
             case GYM -> config.gymRewardMultiplier;
+            case ELITE -> config.eliteRewardMultiplier;
             case CHAMPION -> config.championRewardMultiplier;
             default -> 1.0;
         };
@@ -749,8 +769,10 @@ public final class RunManager {
     }
 
     private static List<NodeType> rollNodes(RunState state) {
-        if (Scaling.isBossFloor(state.floor)) {
-            return new ArrayList<>(List.of(Scaling.championUnlocked(state.badges) ? NodeType.CHAMPION : NodeType.GYM));
+        if (Scaling.isBossFloor(state)) {
+            NodeType boss = !Scaling.championUnlocked(state.badges) ? NodeType.GYM
+                    : state.eliteWins < RogueConfig.get().eliteCount ? NodeType.ELITE : NodeType.CHAMPION;
+            return new ArrayList<>(List.of(boss));
         }
         RogueConfig config = RogueConfig.get();
         Random random = rng(state, 3);

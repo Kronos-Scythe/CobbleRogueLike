@@ -29,6 +29,24 @@ public final class Scaling {
         return floorInSegment(floor) == Math.max(1, RogueConfig.get().gymEvery);
     }
 
+    /** Boss floor for this state: gym floors before all badges, then every {@code eliteEvery} floors. */
+    public static boolean isBossFloor(RunState state) {
+        RogueConfig config = RogueConfig.get();
+        if (!championUnlocked(state.badges) || state.eliteStartFloor < 0) {
+            return isBossFloor(state.floor);
+        }
+        int every = Math.max(1, config.eliteEvery);
+        return state.floor > state.eliteStartFloor && (state.floor - state.eliteStartFloor) % every == 0;
+    }
+
+    /** Elite Four levels ramp from the last gym's cap to the Champion's. */
+    public static int eliteLevel(RunState state) {
+        RogueConfig config = RogueConfig.get();
+        int from = levelCap(config.gymCount - 1);
+        int to = levelCap(config.gymCount);
+        return from + (int) Math.round((to - from) * (state.eliteWins + 1) / (double) (config.eliteCount + 1));
+    }
+
     public static boolean championUnlocked(int badges) {
         return badges >= RogueConfig.get().gymCount;
     }
