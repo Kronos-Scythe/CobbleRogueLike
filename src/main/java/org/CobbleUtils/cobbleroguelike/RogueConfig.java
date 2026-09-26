@@ -62,6 +62,65 @@ public final class RogueConfig {
             "yungoos", "rockruff", "mudbray", "jangmo-o", "rookidee", "wooloo", "rolycoly", "dreepy",
             "lechonk", "pawmi", "tinkatink", "frigibax", "gimmighoul"));
 
+    // ---------------------------------------------------------------- biomes & encounters
+
+    /**
+     * Each stretch of floors between gyms takes place in one of these. Wild Pokémon come from
+     * Cobblemon's spawn data for the listed biomes/tags ({@code #namespace:tag} or a biome id), so
+     * datapacks and addons that add spawns show up automatically. {@code types} themes trainers,
+     * and is the fallback when the spawn data has nothing to offer.
+     */
+    public List<RogueBiome> biomes = new ArrayList<>(List.of(
+            new RogueBiome("grasslands", "Grasslands", "minecraft:grass_block", List.of("#cobblemon:is_grassland", "#cobblemon:is_plains", "#cobblemon:is_floral"), List.of("normal", "grass", "bug", "flying")),
+            new RogueBiome("forest", "Forest", "minecraft:oak_sapling", List.of("#cobblemon:is_forest", "#cobblemon:is_taiga"), List.of("grass", "bug", "poison", "normal")),
+            new RogueBiome("jungle", "Jungle", "minecraft:jungle_sapling", List.of("#cobblemon:is_jungle", "#cobblemon:is_bamboo", "#cobblemon:is_tropical_island"), List.of("grass", "bug", "poison", "fighting")),
+            new RogueBiome("desert", "Desert", "minecraft:sand", List.of("#cobblemon:is_desert", "#cobblemon:is_arid", "#cobblemon:is_badlands"), List.of("ground", "rock", "fire")),
+            new RogueBiome("savanna", "Savanna", "minecraft:acacia_sapling", List.of("#cobblemon:is_savanna", "#cobblemon:is_shrubland"), List.of("normal", "ground", "fire", "electric")),
+            new RogueBiome("mountains", "Mountains", "minecraft:stone", List.of("#cobblemon:is_mountain", "#cobblemon:is_peak", "#cobblemon:is_highlands", "#cobblemon:is_hills"), List.of("rock", "fighting", "steel", "flying")),
+            new RogueBiome("coast", "Ocean & Coast", "minecraft:tropical_fish_bucket", List.of("#cobblemon:is_ocean", "#cobblemon:is_beach", "#cobblemon:is_coast", "#cobblemon:is_river", "#cobblemon:is_freshwater"), List.of("water", "flying")),
+            new RogueBiome("swamp", "Swamp", "minecraft:lily_pad", List.of("#cobblemon:is_swamp"), List.of("poison", "water", "ground", "bug")),
+            new RogueBiome("tundra", "Tundra", "minecraft:snow_block", List.of("#cobblemon:is_snowy", "#cobblemon:is_freezing", "#cobblemon:is_tundra", "#cobblemon:is_glacial"), List.of("ice", "water", "steel")),
+            new RogueBiome("caves", "Caves", "minecraft:pointed_dripstone", List.of("#cobblemon:is_cave", "#cobblemon:is_dripstone", "#cobblemon:is_lush", "#cobblemon:is_deep_dark"), List.of("rock", "ground", "dark", "ghost", "steel")),
+            new RogueBiome("volcano", "Volcano", "minecraft:magma_block", List.of("#cobblemon:is_volcanic", "#cobblemon:is_thermal", "#minecraft:is_nether"), List.of("fire", "rock", "ground", "dark")),
+            new RogueBiome("mystic", "Mystic Grove", "minecraft:amethyst_shard", List.of("#cobblemon:is_magical", "#cobblemon:is_mushroom", "#cobblemon:is_cherry_blossom", "#cobblemon:is_spooky"), List.of("psychic", "fairy", "ghost", "dragon"))));
+
+    /** Relative weights of Cobblemon spawn buckets for route encounters. */
+    public int commonWeight = 60;
+    public int uncommonWeight = 28;
+    public int rareWeight = 10;
+    public int ultraRareWeight = 2;
+    /** Spawn entries valid in more than this fraction of all biomes are skipped as "everywhere" spawns. */
+    public double maxBiomeSpread = 0.5;
+    /** Chances per route/legendary Pokémon; trainers never get these. */
+    public double shinyChance = 1.0 / 256.0;
+    public double hiddenAbilityChance = 0.10;
+
+    /** A Legendary card is guaranteed on the first floor after earning each of these badge counts. */
+    public List<Integer> legendaryAfterBadges = new ArrayList<>(List.of(2, 4, 6));
+    /** Extra chance for a Legendary card on any other normal floor. */
+    public double legendaryChance = 0.03;
+    /** Box legendaries (Mewtwo, Rayquaza...) only appear from this many badges on. */
+    public int restrictedLegendaryBadges = 6;
+    /** Ultra Beasts and Paradox Pokémon count as legendary encounters. */
+    public boolean includeUltraBeasts = true;
+    public boolean includeParadox = true;
+
+    public static final class RogueBiome {
+        public String id;
+        public String name;
+        public String icon;
+        public List<String> biomes;
+        public List<String> types;
+
+        public RogueBiome(String id, String name, String icon, List<String> biomes, List<String> types) {
+            this.id = id;
+            this.name = name;
+            this.icon = icon;
+            this.biomes = new ArrayList<>(biomes);
+            this.types = new ArrayList<>(types);
+        }
+    }
+
     // ---------------------------------------------------------------- economy
 
     public int startingMoney = 1500;

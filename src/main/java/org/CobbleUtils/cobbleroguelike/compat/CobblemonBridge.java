@@ -98,6 +98,46 @@ public final class CobblemonBridge {
 
     private static final Set<String> SPECIAL_LABELS = Set.of("legendary", "mythical", "ultra_beast", "paradox", "restricted");
 
+    /** Species by id; bare names default to the cobblemon namespace. Null if unknown. */
+    public static Species speciesById(String name) {
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        net.minecraft.util.Identifier id = net.minecraft.util.Identifier.tryParse(name.contains(":") ? name : "cobblemon:" + name);
+        return id == null ? null : PokemonSpecies.INSTANCE.getByIdentifier(id);
+    }
+
+    /** Legendary, mythical, Ultra Beast, paradox or restricted. */
+    public static boolean isSpecial(Species species) {
+        return species.getLabels().stream().anyMatch(SPECIAL_LABELS::contains);
+    }
+
+    public static int bst(Species species) {
+        return species.getBaseStats().values().stream().mapToInt(Integer::intValue).sum();
+    }
+
+    /** Id usable in a property string: bare path for Cobblemon species, full id for addons. */
+    public static String propertyId(Species species) {
+        net.minecraft.util.Identifier id = species.getResourceIdentifier();
+        return id.getNamespace().equals("cobblemon") ? id.getPath() : id.toString();
+    }
+
+    /** Legendary-encounter candidates up to a base stat total. */
+    public static List<String> legendaryPool(int maxBst, boolean allowRestricted, boolean includeUltraBeasts, boolean includeParadox) {
+        List<String> result = new ArrayList<>();
+        for (Species species : PokemonSpecies.INSTANCE.getImplemented()) {
+            Set<String> labels = species.getLabels();
+            boolean eligible = labels.contains("legendary") || labels.contains("mythical")
+                    || (includeUltraBeasts && labels.contains("ultra_beast"))
+                    || (includeParadox && labels.contains("paradox"));
+            if (!eligible || (!allowRestricted && labels.contains("restricted")) || bst(species) > maxBst) {
+                continue;
+            }
+            result.add(propertyId(species));
+        }
+        return result;
+    }
+
     /**
      * Implemented species ids with a base stat total within {@code [minBst, maxBst]}, optionally
      * of one type. Legendaries, mythicals, Ultra Beasts and paradoxes are excluded unless allowed.
@@ -185,6 +225,15 @@ public final class CobblemonBridge {
     public static ItemStack icon(String speciesName) {
         Species species = PokemonSpecies.INSTANCE.getByName(speciesName);
         return species == null ? null : PokemonItem.from(species, Set.of(), 1, null);
+    }
+
+    /** Model icon for a full property string (forms, shiny...). Null if it can't be built. */
+    public static ItemStack iconFromProperties(String properties) {
+        try {
+            return PokemonItem.from(PokemonProperties.Companion.parse(properties));
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     public static Text displayName(Pokemon pokemon) {

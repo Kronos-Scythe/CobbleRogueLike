@@ -9,10 +9,12 @@ import com.cobblemon.mod.common.battles.BattleSide;
 import com.cobblemon.mod.common.battles.BattleStartResult;
 import com.cobblemon.mod.common.battles.SuccessfulBattleStart;
 import com.cobblemon.mod.common.battles.actor.PlayerBattleActor;
+import com.cobblemon.mod.common.battles.actor.PokemonBattleActor;
 import com.cobblemon.mod.common.battles.ai.StrongBattleAI;
 import com.cobblemon.mod.common.battles.pokemon.BattlePokemon;
 import com.cobblemon.mod.common.entity.npc.NPCBattleActor;
 import com.cobblemon.mod.common.entity.npc.NPCEntity;
+import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import kotlin.Unit;
 import net.minecraft.server.MinecraftServer;
@@ -59,31 +61,69 @@ public final class CobblemonBattles {
             topLevel = Math.max(topLevel, pokemon.getLevel());
         }
 
-        NPCEntity npc = TrainerNpcs.spawn(player, trainerName, topLevel);
+        NPCEntity npc = RunEntities.spawn(player, trainerName, topLevel);
         if (npc == null) {
             return null;
         }
         int skill = Math.max(0, Math.min(5, aiSkill));
         NPCBattleActor trainer = new NPCBattleActor(npc, team, skill, new StrongBattleAI(skill));
 
-        BattleFormat singles = BattleFormat.Companion.getGEN_9_SINGLES();
-        Set<String> rules = new HashSet<>(singles.getRuleSet());
-        rules.add(BattleRules.BAG_CLAUSE);
-        BattleFormat format = BattleFormat.Companion.setBattleRules(singles, rules);
+        BattleFormat format = singlesWithBagClause();
 
         // canPreempt = false: run battles skip BATTLE_STARTED_PRE, so neither our own
         // outside-battle guard nor other mods (e.g. level-cap mods) can cancel them.
         BattleStartResult result = BattleRegistry.startBattle(format, new BattleSide(playerActor), new BattleSide(trainer), false);
         if (!(result instanceof SuccessfulBattleStart success)) {
-            TrainerNpcs.despawn(npc);
+            RunEntities.despawn(npc);
             return null;
         }
         PokemonBattle battle = success.getBattle();
         MinecraftServer server = player.getServer();
         onEnd(battle, ended -> server.execute(() ->
                 // Give the NPC time to recall its Pokémon before it disappears.
-                Scheduler.runLater(60, () -> TrainerNpcs.despawn(npc))));
+                Scheduler.runLater(60, () -> RunEntities.despawn(npc))));
         return battle;
+    }
+
+    /**
+     * Starts a wild battle against a Legendary spawned in front of the player. Otherwise it works
+     * like {@link #startTrainerBattle}: same party handling and Bag Clause, and the Pokémon is
+     * uncatchable and despawned after the battle. {@code properties} is the Pokémon to fight.
+     */
+    public static PokemonBattle startWildBattle(ServerPlayerEntity player, String properties, int aiSkill) {
+        List<BattlePokemon> playerTeam = new ArrayList<>(CobblemonBridge.party(player).toBattleTeam(false, false, null));
+        playerTeam.sort(Comparator.comparing(pokemon -> pokemon.getHealth() <= 0));
+        if (playerTeam.isEmpty() || playerTeam.get(0).getHealth() <= 0) {
+            return null;
+        }
+        PlayerBattleActor playerActor = new PlayerBattleActor(player.getUuid(), playerTeam);
+
+        PokemonEntity entity = RunEntities.spawnWild(player, properties);
+        if (entity == null) {
+            return null;
+        }
+        Pokemon wild = entity.getPokemon();
+        BattlePokemon battlePokemon = new BattlePokemon(wild, wild, ignored -> Unit.INSTANCE);
+        int skill = Math.max(0, Math.min(5, aiSkill));
+        PokemonBattleActor wildActor = new PokemonBattleActor(wild.getUuid(), battlePokemon, 32.0F, new StrongBattleAI(skill));
+
+        BattleStartResult result = BattleRegistry.startBattle(singlesWithBagClause(), new BattleSide(playerActor), new BattleSide(wildActor), false);
+        if (!(result instanceof SuccessfulBattleStart success)) {
+            RunEntities.despawn(entity);
+            return null;
+        }
+        PokemonBattle battle = success.getBattle();
+        entity.setBattleId(battle.getBattleId());
+        MinecraftServer server = player.getServer();
+        onEnd(battle, ended -> server.execute(() -> Scheduler.runLater(40, () -> RunEntities.despawn(entity))));
+        return battle;
+    }
+
+    private static BattleFormat singlesWithBagClause() {
+        BattleFormat singles = BattleFormat.Companion.getGEN_9_SINGLES();
+        Set<String> rules = new HashSet<>(singles.getRuleSet());
+        rules.add(BattleRules.BAG_CLAUSE);
+        return BattleFormat.Companion.setBattleRules(singles, rules);
     }
 
     /** Force-stops the battle the player is in. Returns false if they aren't in one. */

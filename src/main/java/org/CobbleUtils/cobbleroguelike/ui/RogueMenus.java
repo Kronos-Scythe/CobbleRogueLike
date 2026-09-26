@@ -8,6 +8,7 @@ import net.minecraft.util.Formatting;
 import org.CobbleUtils.cobbleroguelike.RogueConfig;
 import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
 import org.CobbleUtils.cobbleroguelike.run.RunManager;
+import org.CobbleUtils.cobbleroguelike.run.Biomes;
 import org.CobbleUtils.cobbleroguelike.run.RunState;
 import org.CobbleUtils.cobbleroguelike.run.Scaling;
 import org.CobbleUtils.cobbleroguelike.run.TrainerGenerator;
@@ -118,7 +119,7 @@ public final class RogueMenus {
     }
 
     public static void path(ServerPlayerEntity player, RunState state) {
-        Menu menu = new Menu(Text.literal("Floor " + state.floor + " - choose a path"));
+        Menu menu = new Menu(Text.literal("Floor " + state.floor + " - " + Biomes.get(state.biome).name));
         for (int i = 0; i < state.nodeChoices.size() && i < CHOICE_SLOTS.length; i++) {
             int index = i;
             RunState.NodeType node = state.nodeChoices.get(i);
@@ -126,7 +127,7 @@ public final class RogueMenus {
                 case ROUTE -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:grass_block",
                         Text.literal("Route").formatted(Formatting.GREEN), List.of(
                                 Text.literal("Pick one of several wild Pokémon"),
-                                Text.literal("to join your team."))),
+                                Text.literal("from the " + Biomes.get(state.biome).name + " to join your team."))),
                         p -> RunManager.get().chooseNode(p, index));
                 case REST -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:campfire",
                         Text.literal("Rest stop").formatted(Formatting.GOLD), List.of(
@@ -148,6 +149,12 @@ public final class RogueMenus {
                                 Text.literal("The final battle, Lv. " + Scaling.levelCap(state.badges) + "."),
                                 Text.literal("Win to complete your run!"))),
                         p -> RunManager.get().chooseNode(p, index));
+                case LEGENDARY -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:nether_star",
+                        Text.literal("Legendary encounter").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), List.of(
+                                Text.literal("A legendary Pokémon has appeared!"),
+                                Text.literal("Defeat it and it joins your team."),
+                                Text.literal("You can still walk away after seeing it."))),
+                        p -> RunManager.get().chooseNode(p, index));
             }
         }
         addControls(menu, state);
@@ -159,8 +166,10 @@ public final class RogueMenus {
         String icon = switch (state.battleKind) {
             case GYM -> "minecraft:gold_block";
             case CHAMPION -> "minecraft:dragon_head";
+            case LEGENDARY -> "minecraft:nether_star";
             default -> "minecraft:iron_sword";
         };
+        boolean legendary = state.battleKind == RunState.NodeType.LEGENDARY && !state.battleTeam.isEmpty();
         int maxLevel = 0;
         for (String member : state.battleTeam) {
             maxLevel = Math.max(maxLevel, levelOf(member));
@@ -169,12 +178,23 @@ public final class RogueMenus {
         if (!state.battleType.isEmpty()) {
             lore.add(Text.literal("Type: " + TrainerGenerator.capitalize(state.battleType)).formatted(Formatting.YELLOW));
         }
-        lore.add(Text.literal("Team: " + state.battleTeam.size() + " Pokémon"));
-        lore.add(Text.literal("Strongest: Lv. " + maxLevel));
+        if (legendary) {
+            lore.add(Text.literal(describeProperties(state.battleTeam.get(0))).formatted(Formatting.LIGHT_PURPLE));
+            lore.add(Text.literal("Defeat it and it joins your team!").formatted(Formatting.GREEN));
+        } else {
+            lore.add(Text.literal("Team: " + state.battleTeam.size() + " Pokémon"));
+            lore.add(Text.literal("Strongest: Lv. " + maxLevel));
+        }
         lore.add(Text.literal(""));
         lore.add(Text.literal("Your damage carries over between battles.").formatted(Formatting.GRAY));
         lore.add(Text.literal("Losing or forfeiting ends the run!").formatted(Formatting.RED));
-        menu.icon(13, Menu.stack(icon, Text.literal(state.battleName).formatted(Formatting.GOLD), lore));
+        ItemStack iconStack = legendary ? speciesIcon(state.battleTeam.get(0)) : Menu.stack(icon, Text.literal(""), List.of());
+        menu.icon(13, Menu.stack(iconStack, Text.literal(state.battleName).formatted(Formatting.GOLD), lore));
+        if (legendary) {
+            menu.button(24, Menu.stack("minecraft:oak_door", Text.literal("Leave it").formatted(Formatting.GRAY), List.of(
+                    Text.literal("Skip this encounter and move on."))),
+                    p -> RunManager.get().skipLegendary(p));
+        }
         menu.button(22, Menu.stack("minecraft:lime_concrete", Text.literal("Fight!").formatted(Formatting.GREEN, Formatting.BOLD), List.of()),
                 p -> RunManager.get().startBattle(p));
         addControls(menu, state);
@@ -229,6 +249,7 @@ public final class RogueMenus {
     private static void addControls(Menu menu, RunState state) {
         menu.icon(18, Menu.stack("minecraft:map", Text.literal("Floor " + state.floor).formatted(Formatting.WHITE), List.of(
                 Text.literal("Badges: " + state.badges + "/" + RogueConfig.get().gymCount),
+                Text.literal("Biome: " + Biomes.get(state.biome).name).formatted(Formatting.AQUA),
                 Text.literal("Level cap: " + Scaling.levelCap(state.badges)),
                 Text.literal("Coins: " + state.money).formatted(Formatting.GOLD))));
         menu.button(19, Menu.stack("minecraft:emerald", Text.literal("Shop").formatted(Formatting.GREEN), List.of(
@@ -241,20 +262,46 @@ public final class RogueMenus {
     }
 
     /** Model icon for a property string like {@code "zubat level=7"}, falling back to a Poké Ball. */
+    /** Model icon matching the property string (form, shiny...), falling back to a Poké Ball. */
     private static ItemStack speciesIcon(String properties) {
-        ItemStack icon = CobblemonBridge.icon(properties.split(" ")[0]);
+        ItemStack icon = CobblemonBridge.iconFromProperties(properties);
         return icon != null ? icon : Menu.stack("cobblemon:poke_ball", Text.literal(""), List.of());
     }
 
+    /** e.g. {@code "vulpix alolan level=12 shiny=yes"} becomes "Vulpix (Alolan) Lv.12 ★ Shiny". */
     private static String describeProperties(String properties) {
         String[] parts = properties.split(" ");
-        String name = pretty(parts[0]);
-        for (String part : parts) {
+        String species = parts[0].contains(":") ? parts[0].substring(parts[0].indexOf(':') + 1) : parts[0];
+        StringBuilder name = new StringBuilder(pretty(species));
+        List<String> forms = new ArrayList<>();
+        String level = "";
+        boolean shiny = false;
+        boolean hidden = false;
+        for (int i = 1; i < parts.length; i++) {
+            String part = parts[i];
             if (part.startsWith("level=")) {
-                return name + " Lv." + part.substring("level=".length());
+                level = part.substring("level=".length());
+            } else if (part.equals("shiny=yes")) {
+                shiny = true;
+            } else if (part.equals("hiddenability=yes")) {
+                hidden = true;
+            } else if (!part.contains("=")) {
+                forms.add(pretty(part));
             }
         }
-        return name;
+        if (!forms.isEmpty()) {
+            name.append(" (").append(String.join(", ", forms)).append(")");
+        }
+        if (!level.isEmpty()) {
+            name.append(" Lv.").append(level);
+        }
+        if (shiny) {
+            name.append(" ★ Shiny");
+        }
+        if (hidden) {
+            name.append(" [Hidden Ability]");
+        }
+        return name.toString();
     }
 
     private static String pretty(String species) {

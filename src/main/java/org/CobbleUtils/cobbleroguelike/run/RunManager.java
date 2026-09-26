@@ -120,6 +120,9 @@ public final class RunManager {
 
     /** Fixes up states loaded from older builds so the menus always have something to show. */
     private void repair(RunState state) {
+        if (state.biome.isEmpty()) {
+            state.biome = Biomes.roll(state, rng(state, 5));
+        }
         if (state.phase == Phase.BATTLE && state.battleTeam.isEmpty()) {
             state.phase = Phase.CHOOSE_NODE;
         }
@@ -252,6 +255,7 @@ public final class RunManager {
             CobblemonBridge.party(player).add(partner);
             RunState state = new RunState(id, new Random().nextLong());
             state.money = RogueConfig.get().startingMoney;
+            state.biome = Biomes.roll(state, new Random(state.seed ^ 0x5EEDB10EL));
             advanceFloor(state);
             storage.writeRun(state);
             active.put(id, state);
@@ -398,7 +402,7 @@ public final class RunManager {
                 message(player, "Your team rested and is fully healed.", Formatting.GREEN);
                 advanceFloor(state);
             }
-            case TRAINER, GYM, CHAMPION -> {
+            case TRAINER, GYM, CHAMPION, LEGENDARY -> {
                 TrainerGenerator.prepare(state, state.nodeChoices.get(index), rng(state, 10 + index));
                 state.phase = Phase.BATTLE;
             }
@@ -421,7 +425,9 @@ public final class RunManager {
         for (String properties : state.battleTeam) {
             team.add(CobblemonBridge.create(properties));
         }
-        PokemonBattle battle = CobblemonBattles.startTrainerBattle(player, state.battleName, team, state.battleSkill);
+        PokemonBattle battle = state.battleKind == NodeType.LEGENDARY
+                ? CobblemonBattles.startWildBattle(player, state.battleTeam.get(0), state.battleSkill)
+                : CobblemonBattles.startTrainerBattle(player, state.battleName, team, state.battleSkill);
         if (battle == null) {
             message(player, "The battle couldn't start. Is your lead Pokémon able to fight?", Formatting.RED);
             return;
@@ -472,6 +478,16 @@ public final class RunManager {
                 if (RogueConfig.get().healAfterGym) {
                     CobblemonBridge.healParty(player);
                 }
+                state.biome = Biomes.roll(state, rng(state, 5));
+                message(player, "You travel on to the " + Biomes.get(state.biome).name + ".", Formatting.AQUA);
+            }
+            case LEGENDARY -> {
+                String recruit = state.battleTeam.get(0);
+                message(player, state.battleName.replaceFirst("^Wild ", "") + " was impressed by your strength and joins your team!", Formatting.LIGHT_PURPLE);
+                message(player, "+" + reward + " coins (" + state.money + " total).", Formatting.GOLD);
+                state.clearBattle();
+                recruit(player, state, recruit);
+                return;
             }
             default -> message(player, "You defeated " + state.battleName + "!", Formatting.GREEN);
         }
@@ -512,6 +528,33 @@ public final class RunManager {
         if (!hadBattle) {
             message(player, "You're not in a battle; ending your run.", Formatting.YELLOW);
         }
+    }
+
+    /** Walks away from a Legendary encounter without fighting it. */
+    public void skipLegendary(ServerPlayerEntity player) {
+        RunState state = requirePhase(player, Phase.BATTLE);
+        if (state == null || state.battleKind != NodeType.LEGENDARY) {
+            return;
+        }
+        message(player, "You leave " + state.battleName.replaceFirst("^Wild ", "") + " in peace.", Formatting.GRAY);
+        state.clearBattle();
+        advanceFloor(state);
+        save(player, state);
+        openCurrent(player);
+    }
+
+    /** Adds a rogue Pokémon to the party, going through the release screen if it's full. */
+    private void recruit(ServerPlayerEntity player, RunState state, String properties) {
+        state.encounterOptions.clear();
+        if (CobblemonBridge.partyMembers(player).size() >= 6) {
+            state.pendingEncounter = properties;
+            state.phase = Phase.RELEASE;
+        } else {
+            CobblemonBridge.party(player).add(CobblemonBridge.createRogue(properties));
+            advanceFloor(state);
+        }
+        save(player, state);
+        openCurrent(player);
     }
 
     /** Current run level cap for a player, or -1 if they aren't in a run. */
@@ -646,13 +689,7 @@ public final class RunManager {
     }
 
     private static List<String> rollEncounters(RunState state) {
-        RogueConfig config = RogueConfig.get();
-        int level = Scaling.encounterLevel(state);
-        List<String> result = new ArrayList<>();
-        for (String species : pickDistinct(config.encounterPool, config.encounterOptions, rng(state, 2))) {
-            result.add(species + " level=" + level);
-        }
-        return result;
+        return Encounters.roll(state, rng(state, 2));
     }
 
     private static List<NodeType> rollNodes(RunState state) {
@@ -676,16 +713,16 @@ public final class RunManager {
         if (nodes.stream().allMatch(node -> node == NodeType.REST)) {
             nodes.set(random.nextInt(nodes.size()), NodeType.ROUTE);
         }
-        return nodes;
-    }
-
-    private static List<String> pickDistinct(List<String> pool, int count, Random random) {
-        List<String> valid = new ArrayList<>(pool.stream().filter(CobblemonBridge::speciesExists).toList());
-        List<String> result = new ArrayList<>();
-        while (result.size() < count && !valid.isEmpty()) {
-            result.add(valid.remove(random.nextInt(valid.size())));
+        // Legendary card: guaranteed on the first floor after certain badges, rare otherwise.
+        boolean guaranteed = Scaling.floorInSegment(state.floor) == 1 && state.badges > state.legendaryOfferedAt
+                && config.legendaryAfterBadges.contains(state.badges);
+        if (guaranteed || random.nextDouble() < config.legendaryChance) {
+            nodes.set(random.nextInt(nodes.size()), NodeType.LEGENDARY);
+            if (guaranteed) {
+                state.legendaryOfferedAt = state.badges;
+            }
         }
-        return result;
+        return nodes;
     }
 
     public static void message(ServerPlayerEntity player, String text, Formatting color) {

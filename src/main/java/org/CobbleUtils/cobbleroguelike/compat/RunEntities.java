@@ -1,6 +1,9 @@
 package org.CobbleUtils.cobbleroguelike.compat;
 
 import com.cobblemon.mod.common.api.npc.NPCClass;
+import com.cobblemon.mod.common.api.pokemon.PokemonProperties;
+import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
+import net.minecraft.entity.Entity;
 import com.cobblemon.mod.common.api.npc.NPCClasses;
 import com.cobblemon.mod.common.entity.npc.NPCEntity;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
@@ -18,19 +21,20 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Spawns the temporary Cobblemon NPC a run battle is fought against. Cobblemon only sends out
+ * Temporary entities for run battles: the Cobblemon NPC a trainer battle is fought against,
+ * and the wild Pokémon of a Legendary encounter. Cobblemon only sends out
  * a trainer's Pokémon at battle start if the trainer has an entity, so every run trainer
- * gets one. NPCs are tagged, and any tagged NPC that isn't in a live battle (e.g. left behind
- * by a crash) is removed as soon as it loads.
+ * gets one. Both kinds are tagged, and any tagged entity that isn't in a live battle (e.g. left
+ * behind by a crash) is removed as soon as it loads.
  */
-public final class TrainerNpcs {
+public final class RunEntities {
 
     public static final String TAG = "cobbleroguelike_trainer";
     private static final Identifier NPC_CLASS = Identifier.of(Cobbleroguelike.MOD_ID, "rogue_trainer");
     private static final Identifier FALLBACK_CLASS = Identifier.of("cobblemon", "standard");
     private static final Set<UUID> LIVE = ConcurrentHashMap.newKeySet();
 
-    private TrainerNpcs() {
+    private RunEntities() {
     }
 
     public static void register() {
@@ -66,13 +70,30 @@ public final class TrainerNpcs {
         return npc;
     }
 
-    public static void despawn(NPCEntity npc) {
-        if (npc == null) {
+    /** Spawns an uncatchable, AI-less wild Pokémon in front of the player. Returns null on failure. */
+    public static PokemonEntity spawnWild(ServerPlayerEntity player, String properties) {
+        ServerWorld world = player.getServerWorld();
+        Vec3d pos = findSpot(world, player);
+        PokemonEntity entity = PokemonProperties.Companion.parse(properties + " uncatchable no_ai").createEntity(world);
+        float yaw = (float) (MathHelper.atan2(player.getZ() - pos.z, player.getX() - pos.x) * (180.0 / Math.PI)) - 90.0F;
+        entity.refreshPositionAndAngles(pos.x, pos.y, pos.z, yaw, 0.0F);
+        entity.setPersistent();
+        entity.addCommandTag(TAG);
+        LIVE.add(entity.getUuid());
+        if (!world.spawnEntity(entity)) {
+            LIVE.remove(entity.getUuid());
+            return null;
+        }
+        return entity;
+    }
+
+    public static void despawn(Entity entity) {
+        if (entity == null) {
             return;
         }
-        LIVE.remove(npc.getUuid());
-        if (!npc.isRemoved()) {
-            npc.discard();
+        LIVE.remove(entity.getUuid());
+        if (!entity.isRemoved()) {
+            entity.discard();
         }
     }
 

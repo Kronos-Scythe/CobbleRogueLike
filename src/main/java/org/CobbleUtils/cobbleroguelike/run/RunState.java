@@ -18,7 +18,7 @@ public final class RunState {
 
     public enum Phase { CHOOSE_NODE, ENCOUNTER, RELEASE, BATTLE }
 
-    public enum NodeType { ROUTE, REST, TRAINER, GYM, CHAMPION }
+    public enum NodeType { ROUTE, REST, TRAINER, GYM, CHAMPION, LEGENDARY }
 
     public final UUID playerId;
     public final long seed;
@@ -32,6 +32,11 @@ public final class RunState {
     /** Mega Showdown gimmicks unlocked for this run: mega, z, dynamax, tera. */
     public Set<String> gimmicks = new LinkedHashSet<>();
     public List<String> usedGymTypes = new ArrayList<>();
+    /** Current rogue biome id; rolled at the start and after every gym. */
+    public String biome = "";
+    public List<String> usedBiomes = new ArrayList<>();
+    /** Badge count whose guaranteed Legendary card was already offered (-1 = none yet). */
+    public int legendaryOfferedAt = -1;
     public List<NodeType> nodeChoices = new ArrayList<>();
     /** Property strings, e.g. {@code "zubat level=7"}. */
     public List<String> encounterOptions = new ArrayList<>();
@@ -94,6 +99,9 @@ public final class RunState {
         tag.put("bag", bagTag);
         tag.put("gimmicks", writeStrings(new ArrayList<>(gimmicks)));
         tag.put("usedGymTypes", writeStrings(usedGymTypes));
+        tag.putString("biome", biome);
+        tag.put("usedBiomes", writeStrings(usedBiomes));
+        tag.putInt("legendaryOfferedAt", legendaryOfferedAt);
         tag.put("nodeChoices", writeStrings(nodeChoices.stream().map(Enum::name).toList()));
         tag.put("encounterOptions", writeStrings(encounterOptions));
         tag.putString("pendingEncounter", pendingEncounter);
@@ -121,6 +129,9 @@ public final class RunState {
         }
         state.gimmicks.addAll(readStrings(tag, "gimmicks"));
         state.usedGymTypes = readStrings(tag, "usedGymTypes");
+        state.biome = tag.getString("biome");
+        state.usedBiomes = readStrings(tag, "usedBiomes");
+        state.legendaryOfferedAt = tag.contains("legendaryOfferedAt") ? tag.getInt("legendaryOfferedAt") : -1;
         for (String node : readStrings(tag, "nodeChoices")) {
             NodeType type = parse(NodeType.class, node, null);
             if (type != null) {

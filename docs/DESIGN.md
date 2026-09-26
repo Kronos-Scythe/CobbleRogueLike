@@ -41,7 +41,8 @@ The whole run is played through server-side chest menus (`/rogue`). There's no d
 /rogue ──► Start ──► pick your partner from your party/PC
                           │
       ┌───────────── each floor: choose 1 of 3 path cards ─────────────┐
-      │  Route      : pick ONE of 3 wild Pokémon to join (or skip)      │
+      │  Route      : pick ONE of 3 wild Pokémon from the biome (or skip)│
+      │  Legendary  : after badges 2/4/6 (and rarely): beat it to recruit│
       │  Rest stop  : full heal                                         │
       │  Trainer    : generated AI trainer battle                       │
       │  Shop & Bag : always available from every run menu              │
@@ -61,6 +62,23 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
 - **Your partner is one of your own Pokémon.** A PC-style picker lists your party and PC with level, nature, ability and shiny status. The run gets a **copy** with a new UUID and the rogue tag, reset to `starterLevel` (default 5, `resetStarterLevel` in the config). IVs, nature, ability and shininess carry over. The original stays in the journal or PC and never gains EXP, evolves or changes.
 - **Optional "Solo" modifier:** routes are disabled, so it's just you and your partner, and it pays bonus rewards.
 
+### Biomes, diversity and legendaries
+
+- **Biomes:** each stretch of floors between gyms takes place in one of 12 configurable biomes, and a new one is rolled after every gym without repeats. The 12 are Grasslands, Forest, Jungle, Desert, Savanna, Mountains, Ocean & Coast, Swamp, Tundra, Caves, Volcano and Mystic Grove.
+  - Each biome lists Minecraft/Cobblemon biome ids and tags (e.g. `#cobblemon:is_volcanic`) plus theme types.
+- **Wild Pokémon come from Cobblemon's real spawn data:** every `PokemonSpawnDetail` in the world spawn pool whose precomputed `validBiomes` touch the rogue biome.
+  - Regional forms and datapack/addon spawns are included automatically.
+  - "Spawns everywhere" entries (more than `maxBiomeSpread` of all biomes) and special Pokémon are skipped.
+  - Picks are weighted by spawn bucket (common 60 / uncommon 28 / rare 10 / ultra-rare 2) within a strength window for the level, and are distinct by species.
+  - Fallbacks, in order: the whole biome pool, then the biome's types, then the configured encounter pool.
+  - Pools are cached and rebuilt on `/reload` or `/rogue admin reload`.
+- **Extras:** route and legendary Pokémon roll a shiny chance (1/256) and a hidden-ability chance (10%). Menus show form, shiny and hidden ability, with form-accurate model icons.
+- **Legendary encounters:**
+  - A Legendary card is guaranteed on the first floor after badges 2, 4 and 6, and has a 3% chance on other floors.
+  - The legendary spawns in front of the player as an uncatchable, AI-less wild Pokémon at the level cap, and is fought as a real wild battle (`PokemonBattleActor`, `StrongBattleAI`).
+  - Beating it recruits a rogue copy, going through the release screen if the party is full. Players can also walk away from the preview.
+  - Tiers by badges: BST ≤ 600, then ≤ 680, then any. Box legendaries unlock at 6 badges. Ultra Beasts and paradoxes can be turned off in the config.
+
 ### Battles
 
 - Each battle **spawns a temporary Cobblemon NPC** (class `cobbleroguelike:rogue_trainer`, standard model, no AI, invulnerable) a few blocks in front of the player. It is fought through `NPCBattleActor` with `StrongBattleAI`, at skill 1–5 as badges rise (gyms start one step higher). Cobblemon only sends out a trainer's Pokémon at battle start when the trainer has an entity, so an entity-less `TrainerBattleActor` left the battle stuck forever. The NPC is despawned 3 s after the battle ends. NPCs are tagged `cobbleroguelike_trainer`, and any left behind by a crash are removed when their chunk loads.
@@ -69,7 +87,7 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
 - Trainer Pokémon are battle clones and can't be caught. The **Bag Clause** is on, so real-inventory items can't be used.
 - Run battles start with `canPreempt = false`. The outside-battle guard and other mods' pre-battle hooks can't cancel them.
 - **Losing or forfeiting ends the run.** An interrupted battle (a disconnect or server stop) can be challenged again from `/rogue`, against the same trainer.
-- Teams are drawn from all implemented species within a base-stat-total window that grows with level. Legendaries, mythicals, Ultra Beasts and paradoxes are excluded. Gyms use a random type that isn't repeated within a run.
+- Normal trainers are **themed by the current biome**: its real spawns plus species of its types, within a base-stat-total window that grows with level. Gyms use a random type that isn't repeated within a run, and the Champion draws from every species. Legendaries, mythicals, Ultra Beasts and paradoxes only appear as Legendary encounters.
 
 ### Level cap and scaling
 

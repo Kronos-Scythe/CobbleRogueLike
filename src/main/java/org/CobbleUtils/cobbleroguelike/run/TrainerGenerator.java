@@ -42,14 +42,60 @@ public final class TrainerGenerator {
                 state.battleSkill = 5;
                 state.battleTeam = buildTeam(null, teamSize(config.gymTeamSizes, state.badges), cap, true, false, random);
             }
+            case LEGENDARY -> {
+                if (!prepareLegendary(state, random)) {
+                    // Nothing eligible (e.g. legendaries disabled by datapack): fall back to a trainer.
+                    prepare(state, NodeType.TRAINER, random);
+                }
+            }
             default -> {
                 int level = Scaling.trainerLevel(state);
                 int size = Math.min(6, 1 + state.badges / 2 + random.nextInt(2));
                 state.battleName = TRAINER_CLASSES[random.nextInt(TRAINER_CLASSES.length)] + " " + name;
                 state.battleSkill = Math.min(5, 1 + state.badges / 2);
-                state.battleTeam = buildTeam(null, size, level, false, false, random);
+                // Themed by the current biome: its real spawns and its types.
+                List<String> biomePool = Encounters.trainerPool(state, level);
+                state.battleTeam = biomePool.size() >= size
+                        ? teamFrom(biomePool, size, level, false, random)
+                        : buildTeam(null, size, level, false, false, random);
             }
         }
+    }
+
+    /**
+     * A single wild Legendary at the level cap. The tier grows with badges, and box legendaries
+     * only appear late. Returns false if nothing is eligible.
+     */
+    private static boolean prepareLegendary(RunState state, Random random) {
+        RogueConfig config = RogueConfig.get();
+        int maxBst = state.badges < 3 ? 600 : state.badges < 5 ? 680 : 800;
+        List<String> pool = CobblemonBridge.legendaryPool(maxBst, state.badges >= config.restrictedLegendaryBadges,
+                config.includeUltraBeasts, config.includeParadox);
+        if (pool.isEmpty()) {
+            return false;
+        }
+        pool.sort(String::compareTo);
+        String species = pool.get(random.nextInt(pool.size()));
+        int level = Scaling.levelCap(state.badges);
+        state.battleKind = NodeType.LEGENDARY;
+        state.battleName = "Wild " + capitalize(species.contains(":") ? species.substring(species.indexOf(':') + 1) : species);
+        state.battleSkill = Math.min(5, 2 + state.badges / 2);
+        state.battleTeam = new ArrayList<>(List.of(Encounters.withExtras(species + " level=" + level, random)));
+        return true;
+    }
+
+    /** Picks {@code size} distinct entries from a property-string pool and adds levels. */
+    private static List<String> teamFrom(List<String> pool, int size, int level, boolean boss, Random random) {
+        List<String> remaining = new ArrayList<>(pool);
+        List<String> team = new ArrayList<>();
+        for (int i = 0; i < size && !remaining.isEmpty(); i++) {
+            String properties = remaining.remove(random.nextInt(remaining.size()));
+            int memberLevel = boss
+                    ? (i == size - 1 ? level : level - 1 - random.nextInt(3))
+                    : level - random.nextInt(3);
+            team.add(properties + " level=" + Math.max(2, memberLevel));
+        }
+        return team;
     }
 
     /**

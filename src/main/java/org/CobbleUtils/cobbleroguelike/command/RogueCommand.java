@@ -6,6 +6,7 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import org.CobbleUtils.cobbleroguelike.RogueConfig;
+import org.CobbleUtils.cobbleroguelike.compat.SpawnData;
 import org.CobbleUtils.cobbleroguelike.run.RunManager;
 
 import static net.minecraft.server.command.CommandManager.argument;
@@ -73,6 +74,7 @@ public final class RogueCommand {
                         })))
                         .then(literal("reload").executes(ctx -> {
                             RogueConfig.load();
+                            SpawnData.clearCache();
                             ctx.getSource().sendFeedback(() -> Text.literal("Reloaded CobbleRogueLike config"), true);
                             return 1;
                         }))));
