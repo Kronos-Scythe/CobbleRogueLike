@@ -88,8 +88,8 @@ public final class TrainerGenerator {
                         : buildTeam(null, size, level, false, false, random);
             }
         }
-        if (Modifiers.has(state, Modifiers.HARD)) {
-            state.battleSkill = 5; // Hard: the smartest AI for everyone
+        if (config.maxTrainerAi || Modifiers.has(state, Modifiers.HARD)) {
+            state.battleSkill = 5; // the smartest AI for everyone
         }
         state.battleDoubles = doubles && state.battleTeam.size() >= 2;
         if (!tryArchetype(state, kind, doubles, random)) {
@@ -246,7 +246,8 @@ public final class TrainerGenerator {
         boolean eligible = switch (kind) {
             case GYM -> state.badges >= config.archetypeFromBadge || hard;
             case ELITE, CHAMPION -> true;
-            case TRAINER -> hard && state.badges >= 2 && state.battleTeam.size() >= 3;
+            case TRAINER -> state.battleTeam.size() >= 3 && (hard
+                    || (config.trainerArchetypesFromBadge >= 0 && state.badges >= config.trainerArchetypesFromBadge));
             default -> false;
         };
         if (!eligible || state.battleTeam.isEmpty()) {
@@ -260,9 +261,7 @@ public final class TrainerGenerator {
             case ELITE, CHAMPION -> 2;
             default -> 1;
         };
-        if (hard) {
-            tier = Math.min(2, tier + 1);
-        }
+        tier = Math.min(2, tier + Math.max(0, config.setTierBonus) + (hard ? 1 : 0));
         List<String> pool = kind == NodeType.TRAINER
                 ? Encounters.trainerPool(state, level)
                 : CobblemonBridge.speciesPool(type, Scaling.minBst(level), Scaling.maxBst(level), false);
@@ -316,11 +315,10 @@ public final class TrainerGenerator {
             }
         }
         boolean hard = Modifiers.has(state, Modifiers.HARD);
-        if (hard) {
-            tier = Math.min(2, tier + 1);
-            itemsForAll = itemsForAll || state.badges >= 4;
-        }
-        boolean aceItem = state.battleKind != NodeType.TRAINER || state.badges >= 4 || hard;
+        int bonus = Math.max(0, RogueConfig.get().setTierBonus) + (hard ? 1 : 0);
+        tier = Math.min(2, tier + bonus);
+        itemsForAll = itemsForAll || tier >= 1;
+        boolean aceItem = state.battleKind != NodeType.TRAINER || state.badges >= 4 || bonus > 0;
         Set<String> usedItems = new HashSet<>();
         List<String> result = new ArrayList<>();
         for (int i = 0; i < state.battleTeam.size(); i++) {

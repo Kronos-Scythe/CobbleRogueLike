@@ -95,9 +95,18 @@ Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue sav
 
 `config/cobbleroguelike.json` is created on first launch. Highlights:
 
+**Defaults are the hardest settings:**
+- every trainer uses the smartest AI (`maxTrainerAi`) with fully built sets (`setTierBonus: 2`)
+- team archetypes and boss Mega/Tera from the first gym
+- no free heal after gyms or Elite Four fights
+
+Run modifiers (Nuzlocke, Hard…) stay optional. To make the game easier, lower `setTierBonus`, turn off `maxTrainerAi`, or raise the `…FromBadge` options.
+
+
 - **Levels and pacing:** `starterLevel`, `resetStarterLevel`, `gymEvery`, `gymCount`, `levelCaps`, `gymTeamSizes`, `eliteCount`, `eliteEvery`
 - **Co-op:** `coopPartyLimit` (3), `coopMaxDistance`, `coopInviteSeconds`
-- **Battles:** `bossArchetypes`, `archetypeFromBadge`, `doubleBattles` (`bosses` / `all` / `none`), `doubleTrainerChance`, `bossGimmicks`
+- **Difficulty:** `setTierBonus`, `maxTrainerAi`, `trainerArchetypesFromBadge`, `healAfterGym`, `healAfterElite`
+- **Battles:** `bossArchetypes`, `archetypeFromBadge`, `bossTeraFromBadge`, `bossMegaFromBadge`, `doubleBattles` (`bosses` / `all` / `none`), `doubleTrainerChance`, `bossGimmicks`
 - **Encounters:** `biomes` (Minecraft/Cobblemon biome ids and `#tags`, plus theme types), spawn bucket weights, `shinyChance`, `hiddenAbilityChance`, and the legendary settings
 - **Economy:** `startingMoney`, trainer rewards, the `shop` catalog, `moveTutorPrice`
 - **Rewards:** `tokensPerFloor`, `tokensPerBadge`, `championTokenBonus`, the `tokenShop` catalog, modifier bonuses

@@ -96,7 +96,7 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
 
 ### Boss archetypes (hard, planned teams)
 
-Inspired by Radical Red, Run & Bun and the Kaizo hacks. Boss teams (gyms from `archetypeFromBadge`, the Elite Four, the Champion, and on Hard any trainer with 3+ Pokémon from 2 badges) are built by `ArchetypeBuilder` around one plan:
+Inspired by Radical Red, Run & Bun and the Kaizo hacks. Boss teams (gyms from `archetypeFromBadge`, the Elite Four, the Champion, and normal trainers with 3+ Pokémon from `trainerArchetypesFromBadge` or on Hard) are built by `ArchetypeBuilder` around one plan:
 
 | Archetype | Setter (ability, else move + item) | Abusers / bonuses |
 |---|---|---|
@@ -118,7 +118,12 @@ Inspired by Radical Red, Run & Bun and the Kaizo hacks. Boss teams (gyms from `a
   - Ghost, fairy: Trick Room. Flying: Tailwind.
   - The Elite Four and the Champion pick from all archetypes. There's a 30% chance of swapping the first two choices.
 - **All teams in doubles:** spread moves (`allAdjacent`, `allAdjacentFoes` targets) score ×1.25, and support moves include Icy Wind, Electroweb, Tailwind and Wide Guard for speed control.
-- **Hard modifier:** the smartest AI (skill 5) for every trainer, one set tier higher, and archetypes for strong normal trainers.
+- **Difficulty defaults are the hardest** (config, not modifiers):
+  - `setTierBonus: 2`: every trainer gets tier-2 sets, with items, natures, perfect IVs and EVs.
+  - `maxTrainerAi`: AI skill 5 for everyone.
+  - `trainerArchetypesFromBadge: 0`, `archetypeFromBadge: 0`, `bossTeraFromBadge: 0` and `bossMegaFromBadge: 0`.
+  - `healAfterGym: false` and `healAfterElite: false`.
+- **Hard modifier:** adds +2 levels to every trainer on top, still gives max AI and archetypes regardless of config, and adds one set tier when the config is lowered.
 
 ### Elite Four and boss gimmicks
 
@@ -140,7 +145,7 @@ Chosen on a setup screen before the partner picker. Each adds a Rogue Token bonu
 |---|---|---|
 | Nuzlocke | Rogue Pokémon that faint in a won battle are released | +50% |
 | Solo | Route cards become trainers; legendaries pay 2× coins instead of joining | +100% |
-| Hard | Enemies +2 levels, one set tier higher, more held items | +50% |
+| Hard | Enemies +2 levels (plus max AI, archetypes and a tier bonus even if the config is set easier) | +50% |
 | No Shop | The run shop is closed (the bag still works) | +25% |
 | All Doubles | Every trainer battle is a double battle | +25% |
 
@@ -153,7 +158,7 @@ Chosen on a setup screen before the partner picker. Each adds a Rogue Token bonu
 
 - Each battle **spawns a temporary Cobblemon NPC** (class `cobbleroguelike:rogue_trainer`, standard model, no AI, invulnerable) a few blocks in front of the player. It is fought through `NPCBattleActor` with `StrongBattleAI`, at skill 1–5 as badges rise (gyms start one step higher). Cobblemon only sends out a trainer's Pokémon at battle start when the trainer has an entity, so an entity-less `TrainerBattleActor` left the battle stuck forever. The NPC is despawned 3 s after the battle ends. NPCs are tagged `cobbleroguelike_trainer`, and any left behind by a crash are removed when their chunk loads.
 - **`/rogue endbattle`** force-stops the current battle and ends the run. Non-ops can only use it during a run; `/rogue admin endbattle <player>` works on anyone.
-- The player fights with the run party directly, so **damage and fainting carry over** between battles. Rest stops heal, and so does beating a gym (`healAfterGym`).
+- The player fights with the run party directly, so **damage and fainting carry over** between battles. Rest stops heal. Beating a gym only heals if `healAfterGym` is on (off by default).
 - Trainer Pokémon are battle clones and can't be caught. The **Bag Clause** is on, so real-inventory items can't be used.
 - Run battles start with `canPreempt = false`. The outside-battle guard and other mods' pre-battle hooks can't cancel them.
 - **Losing or forfeiting ends the run.** An interrupted battle (a disconnect or server stop) can be challenged again from `/rogue`, against the same trainer.

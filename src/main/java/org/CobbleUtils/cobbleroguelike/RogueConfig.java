@@ -32,8 +32,8 @@ public final class RogueConfig {
     public List<Integer> levelCaps = new ArrayList<>(List.of(15, 21, 27, 33, 40, 47, 54, 61, 70));
     /** Gym team size by badge count; the last entry is the Champion's team size. */
     public List<Integer> gymTeamSizes = new ArrayList<>(List.of(2, 3, 3, 4, 4, 5, 5, 6, 6));
-    /** Heal the party after beating a gym, like a Pokémon Center visit. */
-    public boolean healAfterGym = true;
+    /** Heal the party after beating a gym, like a Pokémon Center visit. Off by default (hardest). */
+    public boolean healAfterGym = false;
 
     /** Weights for the path cards on normal floors. */
     public double trainerWeight = 0.45;
@@ -341,6 +341,20 @@ public final class RogueConfig {
     public double eliteRewardMultiplier = 5.0;
     public boolean healAfterElite = false;
 
+    // ---------------------------------------------------------------- difficulty
+    // Defaults are the hardest settings. Run modifiers (Nuzlocke, Hard, ...) stay optional toggles.
+
+    /**
+     * Added to every trainer's set tier: 0 = best level-up moves, 1 = + TM/egg moves, items,
+     * natures, perfect IVs, 2 = + full EV spreads. Tiers are capped at 2, so 2 means everyone is
+     * fully built. Lower it for an easier game.
+     */
+    public int setTierBonus = 2;
+    /** Every trainer uses Cobblemon's smartest AI (skill 5). */
+    public boolean maxTrainerAi = true;
+    /** Normal trainers with 3+ Pokémon use team archetypes from this many badges on (-1 = never). */
+    public int trainerArchetypesFromBadge = 0;
+
     // ---------------------------------------------------------------- boss archetypes
 
     /**
@@ -350,16 +364,16 @@ public final class RogueConfig {
      */
     public boolean bossArchetypes = true;
     /** Gyms use archetypes from this many badges on (the Elite Four and the Champion always do). */
-    public int archetypeFromBadge = 1;
+    public int archetypeFromBadge = 0;
 
     // ---------------------------------------------------------------- boss gimmicks (Mega Showdown)
 
     /** Gym leaders, the Elite Four and the Champion Mega Evolve or Terastallize (needs Mega Showdown). */
     public boolean bossGimmicks = true;
     /** Gyms use Tera from this many badges on... */
-    public int bossTeraFromBadge = 1;
+    public int bossTeraFromBadge = 0;
     /** ...and Mega Evolution (when a team member can) from this many badges on. */
-    public int bossMegaFromBadge = 3;
+    public int bossMegaFromBadge = 0;
 
     // ---------------------------------------------------------------- co-op
 
