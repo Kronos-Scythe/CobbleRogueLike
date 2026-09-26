@@ -42,14 +42,14 @@ public final class RogueMenus {
                     Text.literal("You still get Rogue Tokens for its progress."))),
                     p -> RunManager.get().abandonSaved(p));
         } else if (saved != null) {
-            menu.button(11, Menu.stack("minecraft:compass", Text.literal("Continue saved run").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
+            menu.button(13, Menu.stack("minecraft:compass", Text.literal("Continue saved run").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
                     Text.literal("Floor " + saved.floor + " - " + Biomes.get(saved.biome).name),
                     Text.literal(saved.badges + " badges, " + saved.money + " coins"),
                     Text.literal(saved.suspendedParty.size() + " Pokémon waiting"),
                     Text.literal(""),
                     Text.literal("Your real party is stored while you play.").formatted(Formatting.YELLOW))),
                     p -> RunManager.get().continueSaved(p));
-            menu.icon(13, guide());
+            menu.icon(11, guide());
             menu.button(15, Menu.stack("minecraft:amethyst_shard", Text.literal("Rogue Shop").formatted(Formatting.LIGHT_PURPLE), List.of(
                     Text.literal(RunManager.get().tokens(player) + " Rogue Tokens"),
                     Text.literal("Spend tokens from past runs on real items."))),
@@ -58,11 +58,11 @@ public final class RogueMenus {
                     Text.literal("Asks for confirmation."))),
                     p -> hub(p, true));
         } else if (RunManager.get().inLobby(player)) {
-            menu.button(11, Menu.stack("cobblemon:poke_ball", Text.literal("Pick your partner").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
+            menu.button(13, Menu.stack("cobblemon:poke_ball", Text.literal("Pick your partner").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
                     Text.literal("You're in a co-op lobby."),
                     Text.literal("The run starts once you both picked."))),
                     p -> partnerPicker(p, 0));
-            menu.icon(13, guide());
+            menu.icon(11, guide());
             menu.button(15, Menu.stack("minecraft:oak_door", Text.literal("Leave lobby").formatted(Formatting.RED), List.of()),
                     p -> {
                         RunManager.get().leaveLobby(p);
@@ -81,14 +81,14 @@ public final class RogueMenus {
                         Text.literal("each of you with up to " + Math.max(1, Math.min(6, RogueConfig.get().coopPartyLimit)) + " Pokémon."))),
                         RogueMenus::invite);
             }
-            menu.button(11, Menu.stack("cobblemon:poke_ball", Text.literal("Start a run").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
+            menu.button(13, Menu.stack("cobblemon:poke_ball", Text.literal("Start a run").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
                     Text.literal("Pick one of your own Pokémon as your"),
                     Text.literal("only partner and build a team as you go."),
                     Text.literal(""),
                     Text.literal("Your real party is stored safely").formatted(Formatting.YELLOW),
                     Text.literal("and given back when the run ends.").formatted(Formatting.YELLOW))),
                     p -> RunManager.get().start(p));
-            menu.icon(13, guide());
+            menu.icon(11, guide());
             menu.button(15, Menu.stack("minecraft:amethyst_shard", Text.literal("Rogue Shop").formatted(Formatting.LIGHT_PURPLE), List.of(
                     Text.literal(RunManager.get().tokens(player) + " Rogue Tokens"),
                     Text.literal("Spend tokens from past runs on real items."))),
