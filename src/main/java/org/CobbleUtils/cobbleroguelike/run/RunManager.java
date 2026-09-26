@@ -950,8 +950,53 @@ public final class RunManager {
             }
         }
         state.coopPicks.clear();
+        state.coopOptions.clear();
         state.encounterOptions.clear();
         advanceFloor(state);
+    }
+
+    /** Route options for a player: their own roll in co-op, the shared list otherwise. */
+    public static List<String> encounterOptionsFor(RunState state, UUID player) {
+        List<String> own = state.coopOptions.get(player);
+        return own != null ? own : state.encounterOptions;
+    }
+
+    /** Gives a player a rogue Pokémon now if there's room, else queues their release screen. */
+    private void give(RunState state, UUID id, String properties) {
+        ServerPlayerEntity member = online(id);
+        if (member != null && CobblemonBridge.partyMembers(member).size() < partyLimit(state)) {
+            CobblemonBridge.party(member).add(CobblemonBridge.createRogue(properties));
+        } else {
+            state.coopPending.put(id, properties);
+        }
+    }
+
+    /** Co-op legendary reward: the clicking player takes one, the partner gets the other. */
+    public void claimLegendary(ServerPlayerEntity player, int index) {
+        RunState state = active.get(player.getUuid());
+        if (state == null || state.coopClaim.size() < 2 || index < 0 || index > 1) {
+            openCurrent(player);
+            return;
+        }
+        UUID id = player.getUuid();
+        String mine = state.coopClaim.get(index);
+        String theirs = state.coopClaim.get(1 - index);
+        state.coopClaim.clear();
+        give(state, id, mine);
+        UUID other = state.other(id);
+        if (other != null) {
+            give(state, other, theirs);
+        }
+        tell(state, player.getName().getString() + " takes " + speciesName(mine) + ", and "
+                + partnerName(state, id) + " gets " + speciesName(theirs) + "!", Formatting.LIGHT_PURPLE);
+        save(player, state);
+        onlineMembers(state).forEach(this::openCurrent);
+    }
+
+    private static String speciesName(String properties) {
+        String species = properties.split(" ")[0];
+        species = species.contains(":") ? species.substring(species.indexOf(':') + 1) : species;
+        return species.isEmpty() ? species : Character.toUpperCase(species.charAt(0)) + species.substring(1);
     }
 
     private void coopChooseEncounter(ServerPlayerEntity player, RunState state, int index) {
@@ -961,17 +1006,13 @@ public final class RunManager {
             openCurrent(player);
             return;
         }
+        List<String> options = encounterOptionsFor(state, id);
         if (index >= 0) {
-            if (index >= state.encounterOptions.size()) {
+            if (index >= options.size()) {
                 openCurrent(player);
                 return;
             }
-            if (state.coopPicks.containsValue(index)) {
-                message(player, partnerName(state, id) + " already took that one. Pick another!", Formatting.RED);
-                openCurrent(player);
-                return;
-            }
-            String picked = state.encounterOptions.get(index);
+            String picked = options.get(index);
             if (CobblemonBridge.partyMembers(player).size() >= partyLimit(state)) {
                 state.coopPending.put(id, picked);
             } else {
@@ -1219,7 +1260,19 @@ public final class RunManager {
             message(player, "Finish your battle first. Stuck? Use /rogue endbattle (this ends your run).", Formatting.RED);
             return;
         }
+        if (state.coopClaim.size() >= 2) {
+            RogueMenus.claim(player, state);
+            return;
+        }
         String coopPending = state.coopPending.get(player.getUuid());
+        if (coopPending != null && CobblemonBridge.partyMembers(player).size() < partyLimit(state)) {
+            // There's room now (e.g. they were offline when it was given): just add it.
+            state.coopPending.remove(player.getUuid());
+            CobblemonBridge.party(player).add(CobblemonBridge.createRogue(coopPending));
+            message(player, speciesName(coopPending) + " joined your team.", Formatting.GREEN);
+            save(player, state);
+            coopPending = null;
+        }
         if (coopPending != null) {
             RogueMenus.release(player, state, coopPending);
             return;
@@ -1241,6 +1294,15 @@ public final class RunManager {
             case ROUTE -> {
                 state.encounterOptions = rollEncounters(state);
                 state.coopPicks.clear();
+                state.coopOptions.clear();
+                if (state.isCoop()) {
+                    // Each player gets their own roll, so nobody has to fight over a pick.
+                    List<UUID> members = state.members();
+                    for (int i = 0; i < members.size(); i++) {
+                        state.coopOptions.put(members.get(i), i == 0 ? new ArrayList<>(state.encounterOptions)
+                                : Encounters.roll(state, rng(state, 2 + 97 * i)));
+                    }
+                }
                 state.phase = Phase.ENCOUNTER;
             }
             case REST -> {
@@ -1385,11 +1447,17 @@ public final class RunManager {
                     return;
                 }
                 String recruit = state.battleTeam.get(0);
+                String companion = state.battleTeam2.isEmpty() ? "" : state.battleTeam2.get(0);
                 tell(state, name + " was impressed by your strength!", Formatting.LIGHT_PURPLE);
                 tell(state, "+" + reward + " coins (" + state.money + " total).", Formatting.GOLD);
                 state.clearBattle();
                 if (state.isCoop()) {
-                    coopRecruit(state, recruit);
+                    if (companion.isEmpty()) {
+                        coopRecruit(state, recruit);
+                    } else {
+                        // One of you takes the legendary, the other its companion.
+                        state.coopClaim = new ArrayList<>(List.of(recruit, companion));
+                    }
                     advanceFloor(state);
                     save(player, state);
                     onlineMembers(state).forEach(this::openCurrent);
@@ -1660,13 +1728,22 @@ public final class RunManager {
         if (nodes.stream().allMatch(node -> node == NodeType.REST)) {
             nodes.set(random.nextInt(nodes.size()), NodeType.ROUTE);
         }
+        if (state.badges == 0 && state.floor <= config.startRouteFloors && !Modifiers.has(state, Modifiers.SOLO)) {
+            // Build a team before the first fights.
+            nodes.replaceAll(node -> node == NodeType.TRAINER ? NodeType.ROUTE : node);
+        }
         if (Modifiers.has(state, Modifiers.SOLO)) {
             nodes.replaceAll(node -> node == NodeType.ROUTE ? NodeType.TRAINER : node);
         }
         // Legendary card: guaranteed on the first floor after certain badges, rare otherwise.
+        // Co-op gets them later: two players clear the early floors more easily.
+        List<Integer> after = state.isCoop() ? config.coopLegendaryAfterBadges : config.legendaryAfterBadges;
+        int from = state.isCoop() ? Math.max(config.legendaryChanceFromBadge, config.coopLegendaryFromBadge)
+                : config.legendaryChanceFromBadge;
         boolean guaranteed = Scaling.floorInSegment(state.floor) == 1 && state.badges > state.legendaryOfferedAt
-                && config.legendaryAfterBadges.contains(state.badges);
-        if (guaranteed || random.nextDouble() < config.legendaryChance) {
+                && after.contains(state.badges) && (!state.isCoop() || state.badges >= config.coopLegendaryFromBadge);
+        boolean lucky = state.badges >= from && random.nextDouble() < config.legendaryChance;
+        if (guaranteed || lucky) {
             nodes.set(random.nextInt(nodes.size()), NodeType.LEGENDARY);
             if (guaranteed) {
                 state.legendaryOfferedAt = state.badges;

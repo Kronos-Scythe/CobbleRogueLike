@@ -77,7 +77,8 @@ public final class TrainerGenerator {
                 int level = Scaling.trainerLevel(state) + hardBonus;
                 int size = Math.min(6, 1 + state.badges / 2 + random.nextInt(2));
                 if (doubles) {
-                    size = Math.max(state.isCoop() ? 3 : 2, size);
+                    // Co-op: one Pokémon each while the difficulty ramps up, then 3+ between them.
+                    size = Math.max(state.isCoop() && !ramping(state) ? 3 : 2, size);
                 }
                 state.battleName = TRAINER_CLASSES[random.nextInt(TRAINER_CLASSES.length)] + " " + name;
                 state.battleSkill = Math.min(5, 1 + state.badges / 2);
@@ -88,7 +89,7 @@ public final class TrainerGenerator {
                         : buildTeam(null, size, level, false, false, random);
             }
         }
-        if (config.maxTrainerAi || Modifiers.has(state, Modifiers.HARD)) {
+        if ((config.maxTrainerAi && !ramping(state)) || Modifiers.has(state, Modifiers.HARD)) {
             state.battleSkill = 5; // the smartest AI for everyone
         }
         state.battleDoubles = doubles && state.battleTeam.size() >= 2;
@@ -177,7 +178,7 @@ public final class TrainerGenerator {
         int aceIndex = state.battleTeam.size() - 1;
         String ace = state.battleTeam.get(aceIndex);
 
-        if (lateBoss || state.badges >= config.bossMegaFromBadge) {
+        if (lateBoss || state.badges >= rampedBadge(state, config.bossMegaFromBadge, 0)) {
             Map<String, List<String>> stones = MegaData.stonesBySpecies();
             // Prefer a team member that can already Mega Evolve; make it the ace. An archetype's
             // setter (slot 0) stays in the lead.
@@ -211,13 +212,42 @@ public final class TrainerGenerator {
                 return;
             }
         }
-        if (lateBoss || state.badges >= config.bossTeraFromBadge) {
+        if (lateBoss || state.badges >= rampedBadge(state, config.bossTeraFromBadge, 1)) {
             String teraType = !state.battleType.isEmpty() ? state.battleType : CobblemonBridge.primaryType(speciesOf(ace));
             if (teraType != null) {
                 state.battleTeam.set(aceIndex, withToken(ace, "tera_type", teraType));
                 state.battleGimmick = "tera";
             }
         }
+    }
+
+    /**
+     * Early-run ramp: before {@code rampUntilBadge} badges the config difficulty is phased in
+     * (weaker sets, no max AI, fewer archetypes and gimmicks). Hard skips the ramp.
+     */
+    static boolean ramping(RunState state) {
+        return state.badges < RogueConfig.get().rampUntilBadge && !Modifiers.has(state, Modifiers.HARD);
+    }
+
+    /** {@code setTierBonus}, phased in over the ramp (+1 on Hard). */
+    private static int tierBonus(RunState state) {
+        RogueConfig config = RogueConfig.get();
+        int bonus = Math.max(0, config.setTierBonus);
+        if (ramping(state)) {
+            bonus = bonus * state.badges / Math.max(1, config.rampUntilBadge);
+        }
+        return bonus + (Modifiers.has(state, Modifiers.HARD) ? 1 : 0);
+    }
+
+    /**
+     * A "from badge" setting, pushed back during the ramp: it can't start before
+     * {@code rampUntilBadge - early} badges (early = 1 lets a feature arrive one gym sooner).
+     */
+    private static int rampedBadge(RunState state, int fromBadge, int early) {
+        if (Modifiers.has(state, Modifiers.HARD)) {
+            return fromBadge;
+        }
+        return Math.max(fromBadge, RogueConfig.get().rampUntilBadge - early);
     }
 
     /** Species id at the start of a property string. */
@@ -271,10 +301,10 @@ public final class TrainerGenerator {
         }
         boolean hard = Modifiers.has(state, Modifiers.HARD);
         boolean eligible = switch (kind) {
-            case GYM -> state.badges >= config.archetypeFromBadge || hard;
+            case GYM -> state.badges >= rampedBadge(state, config.archetypeFromBadge, 1) || hard;
             case ELITE, CHAMPION -> true;
             case TRAINER -> state.battleTeam.size() >= 3 && (hard
-                    || (config.trainerArchetypesFromBadge >= 0 && state.badges >= config.trainerArchetypesFromBadge));
+                    || (config.trainerArchetypesFromBadge >= 0 && state.badges >= rampedBadge(state, config.trainerArchetypesFromBadge, 0)));
             default -> false;
         };
         if (!eligible || state.battleTeam.isEmpty()) {
@@ -288,7 +318,7 @@ public final class TrainerGenerator {
             case ELITE, CHAMPION -> 2;
             default -> 1;
         };
-        tier = Math.min(2, tier + Math.max(0, config.setTierBonus) + (hard ? 1 : 0));
+        tier = Math.min(2, tier + tierBonus(state));
         List<String> pool = kind == NodeType.TRAINER
                 ? Encounters.trainerPool(state, level)
                 : CobblemonBridge.speciesPool(type, Scaling.minBst(level), Scaling.maxBst(level), false);
@@ -341,8 +371,7 @@ public final class TrainerGenerator {
                 itemsForAll = false;
             }
         }
-        boolean hard = Modifiers.has(state, Modifiers.HARD);
-        int bonus = Math.max(0, RogueConfig.get().setTierBonus) + (hard ? 1 : 0);
+        int bonus = tierBonus(state);
         tier = Math.min(2, tier + bonus);
         itemsForAll = itemsForAll || tier >= 1;
         boolean aceItem = state.battleKind != NodeType.TRAINER || state.badges >= 4 || bonus > 0;

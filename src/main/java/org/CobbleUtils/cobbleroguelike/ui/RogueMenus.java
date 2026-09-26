@@ -408,30 +408,58 @@ public final class RogueMenus {
 
     public static void encounter(ServerPlayerEntity player, RunState state) {
         Menu menu = new Menu(Text.literal("Wild Pokémon appeared!"), RUN_ROWS);
-        Integer myPick = state.coopPicks.get(player.getUuid());
-        UUID otherId = state.other(player.getUuid());
-        Integer otherPick = otherId == null ? null : state.coopPicks.get(otherId);
-        for (int i = 0; i < state.encounterOptions.size() && i < CHOICE_SLOTS.length; i++) {
+        UUID id = player.getUuid();
+        Integer myPick = state.coopPicks.get(id);
+        UUID otherId = state.other(id);
+        List<String> options = RunManager.encounterOptionsFor(state, id);
+        for (int i = 0; i < options.size() && i < CHOICE_SLOTS.length; i++) {
             int index = i;
-            String properties = state.encounterOptions.get(i);
+            String properties = options.get(i);
             List<Text> lore = new ArrayList<>();
             if (myPick != null && myPick == index) {
                 lore.add(Text.literal("Your pick!").formatted(Formatting.GREEN));
-            } else if (otherPick != null && otherPick == index) {
-                lore.add(Text.literal("Taken by " + RunManager.get().partnerName(state, player.getUuid())).formatted(Formatting.RED));
             } else if (myPick != null) {
-                lore.add(Text.literal("Waiting for " + RunManager.get().partnerName(state, player.getUuid()) + "...").formatted(Formatting.GRAY));
+                lore.add(Text.literal("Waiting for " + RunManager.get().partnerName(state, id) + "...").formatted(Formatting.GRAY));
             } else {
                 lore.add(Text.literal("Click to add to your team."));
             }
             if (state.isCoop()) {
-                lore.add(Text.literal("Each player takes a different one (max " + RunManager.partyLimit(state) + " each).").formatted(Formatting.DARK_GRAY));
+                lore.add(Text.literal("These are your own options (max " + RunManager.partyLimit(state) + " Pokémon each).").formatted(Formatting.DARK_GRAY));
             }
             menu.button(CHOICE_SLOTS[i], Menu.stack(speciesIcon(properties), Text.literal(describeProperties(properties)).formatted(Formatting.AQUA), lore),
                     p -> RunManager.get().chooseEncounter(p, index));
         }
+        if (otherId != null) {
+            boolean done = state.coopPicks.containsKey(otherId);
+            menu.icon(4, Menu.stack(done ? "minecraft:lime_dye" : "minecraft:clock",
+                    Text.literal(RunManager.get().partnerName(state, id) + (done ? " has picked" : " is choosing...")).formatted(done ? Formatting.GREEN : Formatting.GRAY),
+                    List.of()));
+        }
         menu.button(22, Menu.stack("minecraft:oak_door", Text.literal("Skip").formatted(Formatting.GRAY), List.of()),
                 p -> RunManager.get().chooseEncounter(p, -1));
+        addControls(menu, state, id);
+        menu.open(player);
+    }
+
+    /** Co-op legendary win: one player takes the legendary, the other gets its companion. */
+    public static void claim(ServerPlayerEntity player, RunState state) {
+        Menu menu = new Menu(Text.literal("Split the reward"), RUN_ROWS);
+        String partner = RunManager.get().partnerName(state, player.getUuid());
+        menu.icon(4, Menu.stack("minecraft:nether_star", Text.literal("You won!").formatted(Formatting.LIGHT_PURPLE), List.of(
+                Text.literal("One of you takes the legendary,"),
+                Text.literal("the other gets its companion."),
+                Text.literal("Whoever clicks first chooses.").formatted(Formatting.DARK_GRAY))));
+        String[] labels = {"Legendary", "Companion"};
+        int[] slots = {11, 15};
+        for (int i = 0; i < 2 && i < state.coopClaim.size(); i++) {
+            int index = i;
+            String properties = state.coopClaim.get(i);
+            menu.button(slots[i], Menu.stack(speciesIcon(properties), Text.literal(describeProperties(properties)).formatted(Formatting.AQUA), List.of(
+                    Text.literal(labels[i]).formatted(Formatting.GOLD),
+                    Text.literal(partner + " gets the other one."),
+                    Text.literal("Click to take.").formatted(Formatting.YELLOW))),
+                    p -> RunManager.get().claimLegendary(p, index));
+        }
         addControls(menu, state, player.getUuid());
         menu.open(player);
     }
@@ -562,7 +590,6 @@ public final class RogueMenus {
                 Text.literal("/rogue shop, /rogue end, /rogue endbattle, /rogue clean").formatted(Formatting.DARK_GRAY)));
     }
 
-    /** Model icon for a property string like {@code "zubat level=7"}, falling back to a Poké Ball. */
     /** Model icon matching the property string (form, shiny...), falling back to a Poké Ball. */
     private static ItemStack speciesIcon(String properties) {
         ItemStack icon = CobblemonBridge.iconFromProperties(properties);

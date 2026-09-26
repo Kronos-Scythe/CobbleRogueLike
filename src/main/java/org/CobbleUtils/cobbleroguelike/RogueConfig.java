@@ -96,9 +96,11 @@ public final class RogueConfig {
     public double hiddenAbilityChance = 0.10;
 
     /** A Legendary card is guaranteed on the first floor after earning each of these badge counts. */
-    public List<Integer> legendaryAfterBadges = new ArrayList<>(List.of(2, 4, 6));
-    /** Extra chance for a Legendary card on any other normal floor. */
-    public double legendaryChance = 0.03;
+    public List<Integer> legendaryAfterBadges = new ArrayList<>(List.of(3, 6));
+    /** Extra chance for a Legendary card on any other normal floor... */
+    public double legendaryChance = 0.01;
+    /** ...but only from this many badges on. */
+    public int legendaryChanceFromBadge = 2;
     /** Box legendaries (Mewtwo, Rayquaza...) only appear from this many badges on. */
     public int restrictedLegendaryBadges = 6;
     /** Ultra Beasts and Paradox Pokémon count as legendary encounters. */
@@ -357,6 +359,16 @@ public final class RogueConfig {
 
     // ---------------------------------------------------------------- balance
 
+    /**
+     * Difficulty ramps up to the full config settings over the first gyms: before this many badges,
+     * trainers use weaker sets, no max AI, no archetypes for normal trainers and no boss gimmicks.
+     */
+    public int rampUntilBadge = 2;
+    /** The first floors of a run offer routes instead of trainers, so you can build a team first. */
+    public int startRouteFloors = 2;
+    /** Extra battle EXP for Pokémon far below the level cap (up to 2x more). */
+    public boolean catchUpExp = true;
+
     /** EXP multiplier for run Pokémon (still capped at the level cap). */
     public double expMultiplier = 2.0;
     /** Boss prep on gym / Elite Four / Champion previews, once per boss and per player: */
@@ -393,6 +405,10 @@ public final class RogueConfig {
     public int coopMaxDistance = 48;
     /** Seconds an invite stays valid. */
     public int coopInviteSeconds = 120;
+    /** Co-op legendaries: guaranteed after these badge counts instead of {@code legendaryAfterBadges}... */
+    public List<Integer> coopLegendaryAfterBadges = new ArrayList<>(List.of(4, 7));
+    /** ...and never before this many badges (the random chance included). */
+    public int coopLegendaryFromBadge = 4;
 
     // ---------------------------------------------------------------- move tutor
 

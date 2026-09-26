@@ -30,6 +30,10 @@ public final class RunState {
     public Map<UUID, Integer> coopPicks = new HashMap<>();
     /** Co-op: Pokémon waiting for a party slot, per player (their release screen). */
     public Map<UUID, String> coopPending = new HashMap<>();
+    /** Co-op route options per player (each player gets their own roll, so nobody fights over a pick). */
+    public Map<UUID, List<String>> coopOptions = new HashMap<>();
+    /** Co-op legendary reward waiting to be claimed: [legendary, companion]; one each. */
+    public List<String> coopClaim = new ArrayList<>();
     /** Co-op: players who pressed Ready for the upcoming battle (not saved). */
     public final Set<UUID> ready = new HashSet<>();
     public final long seed;
@@ -182,6 +186,10 @@ public final class RunState {
         NbtCompound pending = new NbtCompound();
         coopPending.forEach((id, props) -> pending.putString(id.toString(), props));
         tag.put("coopPending", pending);
+        NbtCompound options = new NbtCompound();
+        coopOptions.forEach((id, list) -> options.put(id.toString(), writeStrings(list)));
+        tag.put("coopOptions", options);
+        tag.put("coopClaim", writeStrings(coopClaim));
         tag.putInt("battleSkill", battleSkill);
         tag.putBoolean("battleDoubles", battleDoubles);
         tag.putString("battleGimmick", battleGimmick);
@@ -241,6 +249,11 @@ public final class RunState {
         for (String key : pending.getKeys()) {
             state.coopPending.put(UUID.fromString(key), pending.getString(key));
         }
+        NbtCompound options = tag.getCompound("coopOptions");
+        for (String key : options.getKeys()) {
+            state.coopOptions.put(UUID.fromString(key), readStrings(options, key));
+        }
+        state.coopClaim = readStrings(tag, "coopClaim");
         state.battleSkill = tag.getInt("battleSkill");
         state.battleDoubles = tag.getBoolean("battleDoubles");
         state.battleGimmick = tag.getString("battleGimmick");

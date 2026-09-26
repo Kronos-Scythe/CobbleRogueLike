@@ -12,10 +12,12 @@ import com.cobblemon.mod.common.battles.SuccessfulBattleStart;
 import com.cobblemon.mod.common.battles.actor.PlayerBattleActor;
 import com.cobblemon.mod.common.battles.actor.PokemonBattleActor;
 import com.cobblemon.mod.common.battles.ai.StrongBattleAI;
+import com.cobblemon.mod.common.battles.ActiveBattlePokemon;
 import com.cobblemon.mod.common.battles.pokemon.BattlePokemon;
 import com.cobblemon.mod.common.entity.npc.NPCBattleActor;
 import com.cobblemon.mod.common.entity.npc.NPCEntity;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
+import com.cobblemon.mod.common.net.messages.client.battle.BattleSwitchPokemonPacket;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import kotlin.Unit;
 import net.minecraft.entity.EquipmentSlot;
@@ -198,6 +200,7 @@ public final class CobblemonBattles {
             RunEntities.despawn(npc1);
             RunEntities.despawn(npc2);
         })));
+        syncAlliesLater(battle);
         return battle;
     }
 
@@ -232,12 +235,44 @@ public final class CobblemonBattles {
         PokemonBattle battle = success.getBattle();
         entity1.setBattleId(battle.getBattleId());
         entity2.setBattleId(battle.getBattleId());
+        syncAlliesLater(battle);
         MinecraftServer server = first.getServer();
         onEnd(battle, ended -> server.execute(() -> Scheduler.runLater(40, () -> {
             RunEntities.despawn(entity1);
             RunEntities.despawn(entity2);
         })));
         return battle;
+    }
+
+    /**
+     * Co-op fix: players reported not seeing their partner's Pokémon tile on the left of the battle
+     * overlay. Once the opening send-outs are done, re-send each player their ally's active
+     * Pokémon (the same packet Cobblemon sends on a switch), so the tile is there either way.
+     */
+    private static void syncAlliesLater(PokemonBattle battle) {
+        Scheduler.runLater(80, () -> {
+            if (battle.getEnded()) {
+                return;
+            }
+            for (BattleSide side : List.of(battle.getSide1(), battle.getSide2())) {
+                for (BattleActor viewer : side.getActors()) {
+                    if (!(viewer instanceof PlayerBattleActor)) {
+                        continue;
+                    }
+                    for (BattleActor ally : side.getActors()) {
+                        if (ally == viewer) {
+                            continue;
+                        }
+                        for (ActiveBattlePokemon active : ally.getActivePokemon()) {
+                            BattlePokemon pokemon = active.getBattlePokemon();
+                            if (pokemon != null) {
+                                viewer.sendUpdate(new BattleSwitchPokemonPacket(active.getPNX(), pokemon, true, active.getIllusion()));
+                            }
+                        }
+                    }
+                }
+            }
+        });
     }
 
     private static List<BattlePokemon> battleTeam(List<Pokemon> team) {
