@@ -96,8 +96,35 @@ public final class TrainerGenerator {
             state.battleTeam = strengthen(state, state.battleDoubles, random);
         }
         applyGimmick(state, random);
+        if (boss) {
+            rollDraft(state, random);
+        }
         if (state.isCoop()) {
             splitForCoop(state, random);
+        }
+    }
+
+    /**
+     * Boss prep "Draft a counter": Pokémon at the level cap whose type hits the boss's type super
+     * effectively (any strong Pokémon for the Champion). No legendaries.
+     */
+    private static void rollDraft(RunState state, Random random) {
+        RogueConfig config = RogueConfig.get();
+        int level = Scaling.levelCap(state.badges);
+        List<String> counterTypes = state.battleType.isEmpty() ? List.of() : TypeChart.countersTo(state.battleType);
+        List<String> pool = new ArrayList<>();
+        if (counterTypes.isEmpty()) {
+            pool.addAll(CobblemonBridge.speciesPool(null, Scaling.minBst(level), Scaling.maxBst(level), false));
+        } else {
+            for (String type : counterTypes) {
+                pool.addAll(CobblemonBridge.speciesPool(type, Scaling.minBst(level), Scaling.maxBst(level), false));
+            }
+        }
+        List<String> distinct = new ArrayList<>(new java.util.TreeSet<>(pool));
+        state.draftOptions = new ArrayList<>();
+        for (int i = 0; i < Math.max(1, config.prepDraftOptions) && !distinct.isEmpty(); i++) {
+            String species = distinct.remove(random.nextInt(distinct.size()));
+            state.draftOptions.add(Encounters.withExtras(species + " level=" + level, random));
         }
     }
 

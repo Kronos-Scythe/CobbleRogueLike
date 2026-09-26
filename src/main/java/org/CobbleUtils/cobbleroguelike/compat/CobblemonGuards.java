@@ -54,6 +54,10 @@ public final class CobblemonGuards {
                 event.cancel();
                 return;
             }
+            double multiplier = org.CobbleUtils.cobbleroguelike.RogueConfig.get().expMultiplier;
+            if (multiplier > 0 && multiplier != 1.0 && event.getSource() instanceof com.cobblemon.mod.common.api.pokemon.experience.BattleExperienceSource) {
+                event.setExperience((int) Math.round(event.getExperience() * multiplier));
+            }
             int room = pokemon.getExperienceGroup().getExperience(cap) - pokemon.getExperience();
             if (event.getExperience() > room) {
                 event.setExperience(Math.max(0, room));

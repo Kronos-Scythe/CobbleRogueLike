@@ -302,6 +302,9 @@ public final class RogueMenus {
                     Text.literal("Skip this encounter and move on."))),
                     p -> RunManager.get().skipLegendary(p));
         }
+        if (RunManager.isBoss(state.battleKind)) {
+            addBossPrep(menu, state, player);
+        }
         if (state.isCoop()) {
             boolean meReady = state.ready.contains(player.getUuid());
             UUID other = state.other(player.getUuid());
@@ -326,6 +329,62 @@ public final class RogueMenus {
             menu.button(22, Menu.stack("minecraft:lime_concrete", Text.literal("Fight!").formatted(Formatting.GREEN, Formatting.BOLD), List.of()),
                     p -> RunManager.get().startBattle(p));
         }
+        addControls(menu, state, player.getUuid());
+        menu.open(player);
+    }
+
+    /** Top row of a boss preview: free, once-per-boss prep so gyms are beatable without grinding. */
+    private static void addBossPrep(Menu menu, RunState state, ServerPlayerEntity player) {
+        RogueConfig config = RogueConfig.get();
+        int cap = Scaling.levelCap(state.badges);
+        menu.icon(1, Menu.stack("minecraft:writable_book", Text.literal("Boss prep").formatted(Formatting.GOLD), List.of(
+                Text.literal("Free help before this fight,"),
+                Text.literal("once each per boss."))));
+        if (config.prepTrainToCap) {
+            boolean used = RunManager.prepUsed(state, player, "train");
+            menu.button(3, Menu.stack(used ? "minecraft:gray_dye" : "cobblemon:exp_candy_xl",
+                    Text.literal("Train to level cap").formatted(used ? Formatting.GRAY : Formatting.GREEN), List.of(
+                            Text.literal("Raise your whole team to Lv. " + cap + "."),
+                            Text.literal("New moves and evolutions happen as usual."),
+                            used ? Text.literal("Used").formatted(Formatting.GRAY) : Text.literal("Click to train").formatted(Formatting.YELLOW))),
+                    p -> RunManager.get().prepTrain(p));
+        }
+        if (config.prepDraft && !state.draftOptions.isEmpty()) {
+            boolean used = RunManager.prepUsed(state, player, "draft");
+            menu.button(4, Menu.stack(used ? "minecraft:gray_dye" : "cobblemon:great_ball",
+                    Text.literal("Draft a counter").formatted(used ? Formatting.GRAY : Formatting.AQUA), List.of(
+                            Text.literal("Pick 1 of " + state.draftOptions.size() + " Pokémon at Lv. " + cap),
+                            Text.literal(state.battleType.isEmpty() ? "that can take on this team."
+                                    : "strong against " + TrainerGenerator.capitalize(state.battleType) + "."),
+                            used ? Text.literal("Used").formatted(Formatting.GRAY) : Text.literal("Click to see them").formatted(Formatting.YELLOW))),
+                    p -> draft(p, RunManager.get().state(p)));
+        }
+        if (config.prepHeal) {
+            boolean used = RunManager.prepUsed(state, player, "heal");
+            menu.button(5, Menu.stack(used ? "minecraft:gray_dye" : "cobblemon:full_restore",
+                    Text.literal("Full heal").formatted(used ? Formatting.GRAY : Formatting.LIGHT_PURPLE), List.of(
+                            Text.literal("Restore your team's HP, PP and status."),
+                            used ? Text.literal("Used").formatted(Formatting.GRAY) : Text.literal("Click to heal").formatted(Formatting.YELLOW))),
+                    p -> RunManager.get().prepHeal(p));
+        }
+    }
+
+    /** Boss prep: choose a counter Pokémon. */
+    public static void draft(ServerPlayerEntity player, RunState state) {
+        if (state == null) {
+            return;
+        }
+        Menu menu = new Menu(Text.literal("Draft a counter"), RUN_ROWS);
+        for (int i = 0; i < state.draftOptions.size() && i < CHOICE_SLOTS.length; i++) {
+            int index = i;
+            String properties = state.draftOptions.get(i);
+            menu.button(CHOICE_SLOTS[i], Menu.stack(speciesIcon(properties), Text.literal(describeProperties(properties)).formatted(Formatting.AQUA), List.of(
+                    Text.literal("Joins your team for the rest of the run."),
+                    Text.literal("Click to draft.").formatted(Formatting.YELLOW))),
+                    p -> RunManager.get().prepDraft(p, index));
+        }
+        menu.button(22, Menu.stack("minecraft:oak_door", Text.literal("Back").formatted(Formatting.GRAY), List.of()),
+                p -> RunManager.get().openCurrent(p));
         addControls(menu, state, player.getUuid());
         menu.open(player);
     }

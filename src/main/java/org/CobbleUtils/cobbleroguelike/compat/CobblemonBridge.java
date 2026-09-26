@@ -259,6 +259,21 @@ public final class CobblemonBridge {
         return Text.translatable(pokemon.getAbility().getDisplayName());
     }
 
+    /**
+     * Gives a Pokémon exactly the EXP it needs to reach {@code level}, the normal way: level-up
+     * moves, evolutions and the EXP screen all happen as usual. Returns true if it gained a level.
+     */
+    public static boolean trainToLevel(ServerPlayerEntity player, Pokemon pokemon, int level) {
+        int needed = pokemon.getExperienceGroup().getExperience(level) - pokemon.getExperience();
+        if (needed <= 0) {
+            return false;
+        }
+        int before = pokemon.getLevel();
+        pokemon.addExperienceWithPlayer(player,
+                new com.cobblemon.mod.common.api.pokemon.experience.SidemodExperienceSource("cobbleroguelike"), needed);
+        return pokemon.getLevel() > before;
+    }
+
     /** Party members that can still fight. */
     public static int healthyCount(ServerPlayerEntity player) {
         int count = 0;

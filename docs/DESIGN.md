@@ -94,6 +94,15 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
   - Gym 5 and later, and the Champion: adds full EV spreads.
   - Normal trainers get the best level-up movesets, and their ace holds an item from 4 badges on.
 
+### Balance: boss prep and EXP
+
+Hard bosses need a way to catch up, like Emerald Rogue's level-1 Chansey but without the grind.
+- **EXP:** run Pokémon get `expMultiplier` (2×) from battles, still clamped at the level cap.
+- **Boss prep** on every gym, Elite Four and Champion preview, once each per boss and per player (co-op too), tracked in `prepUsed`:
+  - **Train to level cap:** gives each run Pokémon exactly the EXP to reach the cap via `addExperienceWithPlayer`, so level-up moves, evolutions and the EXP screen behave normally.
+  - **Draft a counter:** pick 1 of `prepDraftOptions` (3) Pokémon at the cap whose type hits the boss's type super effectively (`TypeChart`), or any strong Pokémon for the Champion. No legendaries. A full team uses the per-player release screen (`coopPending`, now used in solo too).
+  - **Full heal:** gyms and the Elite Four don't heal by default.
+
 ### Boss archetypes (hard, planned teams)
 
 Inspired by Radical Red, Run & Bun and the Kaizo hacks. Boss teams (gyms from `archetypeFromBadge`, the Elite Four, the Champion, and normal trainers with 3+ Pokémon from `trainerArchetypesFromBadge` or on Hard) are built by `ArchetypeBuilder` around one plan:

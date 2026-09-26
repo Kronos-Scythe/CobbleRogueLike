@@ -1115,6 +1115,98 @@ public final class RunManager {
         }
     }
 
+    // ---------------------------------------------------------------- boss prep
+
+    public static boolean isBoss(NodeType kind) {
+        return kind == NodeType.GYM || kind == NodeType.ELITE || kind == NodeType.CHAMPION;
+    }
+
+    /** True if this player already used the given prep action ("train", "draft", "heal") for this boss. */
+    public static boolean prepUsed(RunState state, ServerPlayerEntity player, String action) {
+        return state.prepUsed.contains(player.getUuid() + ":" + action);
+    }
+
+    private RunState requireBossPrep(ServerPlayerEntity player, String action) {
+        RunState state = requirePhase(player, Phase.BATTLE);
+        if (state == null) {
+            return null;
+        }
+        if (!isBoss(state.battleKind)) {
+            openCurrent(player);
+            return null;
+        }
+        if (CobblemonBridge.isInBattle(player)) {
+            message(player, "Finish your battle first.", Formatting.RED);
+            return null;
+        }
+        if (prepUsed(state, player, action)) {
+            message(player, "You already used that before this battle.", Formatting.YELLOW);
+            openCurrent(player);
+            return null;
+        }
+        return state;
+    }
+
+    /** Boss prep: raises the player's run team to the level cap with real EXP (moves and evolutions happen). */
+    public void prepTrain(ServerPlayerEntity player) {
+        if (!RogueConfig.get().prepTrainToCap) {
+            return;
+        }
+        RunState state = requireBossPrep(player, "train");
+        if (state == null) {
+            return;
+        }
+        int cap = Scaling.levelCap(state.badges);
+        int trained = 0;
+        for (Pokemon pokemon : CobblemonBridge.partyMembers(player)) {
+            if (CobblemonBridge.isRogue(pokemon) && pokemon.getLevel() < cap && CobblemonBridge.trainToLevel(player, pokemon, cap)) {
+                trained++;
+            }
+        }
+        state.prepUsed.add(player.getUuid() + ":train");
+        message(player, trained > 0 ? "Your team trained up to the level cap (Lv. " + cap + ")."
+                : "Your team is already at the level cap.", Formatting.GREEN);
+        save(player, state);
+        openCurrent(player);
+    }
+
+    /** Boss prep: a free full heal. */
+    public void prepHeal(ServerPlayerEntity player) {
+        if (!RogueConfig.get().prepHeal) {
+            return;
+        }
+        RunState state = requireBossPrep(player, "heal");
+        if (state == null) {
+            return;
+        }
+        CobblemonBridge.healParty(player);
+        state.prepUsed.add(player.getUuid() + ":heal");
+        message(player, "Your team is fully healed and ready.", Formatting.GREEN);
+        save(player, state);
+        openCurrent(player);
+    }
+
+    /** Boss prep: take one of the counter Pokémon (release screen if the team is full). */
+    public void prepDraft(ServerPlayerEntity player, int index) {
+        if (!RogueConfig.get().prepDraft) {
+            return;
+        }
+        RunState state = requireBossPrep(player, "draft");
+        if (state == null || index < 0 || index >= state.draftOptions.size()) {
+            return;
+        }
+        String picked = state.draftOptions.get(index);
+        state.prepUsed.add(player.getUuid() + ":draft");
+        if (CobblemonBridge.partyMembers(player).size() >= partyLimit(state)) {
+            state.coopPending.put(player.getUuid(), picked);
+        } else {
+            CobblemonBridge.party(player).add(CobblemonBridge.createRogue(picked));
+            message(player, "A new teammate joins you for the fight!", Formatting.GREEN);
+        }
+        save(player, state);
+        openCurrent(player);
+    }
+
     // ---------------------------------------------------------------- run flow
 
     public void openCurrent(ServerPlayerEntity player) {
@@ -1438,7 +1530,8 @@ public final class RunManager {
     /** Releases a party member to make room for the pending encounter. {@code -1} keeps the party as is. */
     public void releaseForPending(ServerPlayerEntity player, int partyIndex) {
         RunState coopState = active.get(player.getUuid());
-        if (coopState != null && coopState.isCoop()) {
+        if (coopState != null && (coopState.isCoop() || coopState.coopPending.containsKey(player.getUuid()))) {
+            // Per-player pending Pokémon: co-op routes, co-op legendaries and boss-prep drafts.
             coopRelease(player, coopState, partyIndex);
             return;
         }
