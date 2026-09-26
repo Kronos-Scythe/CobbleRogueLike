@@ -15,6 +15,7 @@ import net.minecraft.util.Identifier;
 
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import org.CobbleUtils.cobbleroguelike.RogueConfig;
+import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,6 +51,37 @@ public final class Menu {
     private String theme = "";
     private boolean themedContent;
     private final Set<Integer> chestOnly = new HashSet<>();
+    private final Map<Integer, Role> roles = new HashMap<>();
+    private Layout layout = Layout.LIST;
+    /** Shorter title for the run screen, which shows coins, floor and biome elsewhere. */
+    private Text screenTitle;
+
+    /**
+     * Where a slot goes on the run screen. By default a clickable slot is content, anything else
+     * is info, and the nav row is the footer.
+     */
+    public enum Role {
+        /** The screen's options. */
+        CONTENT,
+        /** A description box above the options. */
+        INFO,
+        /** A button along the bottom (page arrows, Shop, Bag...). */
+        FOOTER,
+        /** The Back button in the bottom-right corner. */
+        BACK
+    }
+
+    /** How the run screen lays out the content. */
+    public enum Layout {
+        /** Rows with a name and a summary line (shop items, moves...). */
+        LIST,
+        /** A few big cards side by side (path choices, encounters...). */
+        CARDS,
+        /** Icon tiles in the chest's own 9-wide grid (partner picker, bag...). */
+        GRID,
+        /** Text sections with their full lore (How to play). */
+        PAGE
+    }
 
     /** The menu each player currently has open in the run screen. */
     private static final Map<UUID, OpenView> VIEWS = new ConcurrentHashMap<>();
@@ -102,6 +134,54 @@ public final class Menu {
             actions.remove(slot);
         }
         return this;
+    }
+
+    public Menu layout(Layout layout) {
+        this.layout = layout;
+        return this;
+    }
+
+    public Menu role(int slot, Role role) {
+        roles.put(slot, role);
+        return this;
+    }
+
+    /** A Back button: in the chest at {@code slot}, on the run screen in the bottom-right corner. */
+    public Menu back(int slot, String label, Consumer<ServerPlayerEntity> action) {
+        button(slot, stack("minecraft:oak_door", Text.literal(label).formatted(Formatting.GRAY), List.of()), action);
+        return role(slot, Role.BACK);
+    }
+
+    /** A footer button (page arrows, secondary actions). */
+    public Menu footer(int slot, ItemStack icon, Consumer<ServerPlayerEntity> action) {
+        button(slot, icon, action);
+        return role(slot, Role.FOOTER);
+    }
+
+    /** Run screen title (the chest keeps the full title, e.g. with the coin count). */
+    public Menu screenTitle(Text title) {
+        this.screenTitle = title;
+        return this;
+    }
+
+    Text viewTitle() {
+        return screenTitle != null ? screenTitle : title;
+    }
+
+    Layout layoutType() {
+        return layout;
+    }
+
+    /** The slot's role on the run screen (see {@link Role}). */
+    Role roleOf(int slot) {
+        Role role = roles.get(slot);
+        if (role != null) {
+            return role;
+        }
+        if (navRow >= 0 && slot / 9 == navRow) {
+            return Role.FOOTER;
+        }
+        return actions.containsKey(slot) ? Role.CONTENT : Role.INFO;
     }
 
     /** Chest filler item for empty slots (e.g. the biome's block on an encounter). */
@@ -162,7 +242,7 @@ public final class Menu {
     }
 
     public void open(ServerPlayerEntity player) {
-        if (RogueConfig.get().clientScreen && RogueNetwork.hasClientScreen(player)) {
+        if (usesScreen(player)) {
             if (player.currentScreenHandler != player.playerScreenHandler) {
                 player.closeHandledScreen();
             }
@@ -183,6 +263,11 @@ public final class Menu {
         }
         player.openHandledScreen(new SimpleNamedScreenHandlerFactory(
                 (syncId, playerInventory, p) -> new MenuScreenHandler(syncId, playerInventory, this), title));
+    }
+
+    /** True if this player sees menus on the run screen rather than as chests. */
+    public static boolean usesScreen(ServerPlayerEntity player) {
+        return RogueConfig.get().clientScreen && RogueNetwork.hasClientScreen(player);
     }
 
     /** A click from the run screen. Stale or repeated clicks are ignored. */
@@ -222,8 +307,17 @@ public final class Menu {
         VIEWS.remove(player);
     }
 
-    /** Builds an icon. {@code itemId} may name a Cobblemon item; unknown ids fall back to paper. */
+    /**
+     * Builds an icon. {@code itemId} may name a Cobblemon item, or {@code pokemon:<species>} for a
+     * Pokémon model; unknown ids fall back to paper.
+     */
     public static ItemStack stack(String itemId, Text name, List<Text> lore) {
+        if (itemId.startsWith("pokemon:")) {
+            ItemStack model = CobblemonBridge.icon(itemId.substring("pokemon:".length()));
+            if (model != null) {
+                return stack(model, name, lore);
+            }
+        }
         Identifier id = Identifier.tryParse(itemId);
         Item item = id == null ? Items.PAPER : Registries.ITEM.get(id);
         if (item == Items.AIR) {

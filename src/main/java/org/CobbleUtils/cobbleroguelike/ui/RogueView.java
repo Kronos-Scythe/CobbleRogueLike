@@ -34,10 +34,16 @@ public final class RogueView {
     /** Co-op: the partner's team, shown under yours. */
     public List<Member> partnerParty = new ArrayList<>();
 
-    /** The menu's own buttons and icons, in slot order. */
+    /** {@link Menu.Layout} ordinal: how the content is laid out. */
+    public int layout;
+    /** Description boxes above the content. */
+    public List<Entry> info = new ArrayList<>();
+    /** The screen's options, in slot order. */
     public List<Entry> content = new ArrayList<>();
-    /** The nav bar (Shop, Bag, Tutor...), shown along the bottom. */
+    /** Footer buttons (nav bar, page arrows...). */
     public List<Entry> actions = new ArrayList<>();
+    /** The Back button (bottom-right), if the screen has one. */
+    public List<Entry> back = new ArrayList<>();
 
     /** A party slot: model icon (named, with details as lore), level, HP fraction and held item. */
     public record Member(ItemStack icon, int level, float health, ItemStack held) {
@@ -61,8 +67,11 @@ public final class RogueView {
         buf.writeVarInt(towerCurrent);
         writeMembers(buf, party);
         writeMembers(buf, partnerParty);
+        buf.writeVarInt(layout);
+        writeEntries(buf, info);
         writeEntries(buf, content);
         writeEntries(buf, actions);
+        writeEntries(buf, back);
     }
 
     public static RogueView read(RegistryByteBuf buf) {
@@ -84,8 +93,11 @@ public final class RogueView {
         view.towerCurrent = buf.readVarInt();
         view.party = readMembers(buf);
         view.partnerParty = readMembers(buf);
+        view.layout = buf.readVarInt();
+        view.info = readEntries(buf);
         view.content = readEntries(buf);
         view.actions = readEntries(buf);
+        view.back = readEntries(buf);
         return view;
     }
 

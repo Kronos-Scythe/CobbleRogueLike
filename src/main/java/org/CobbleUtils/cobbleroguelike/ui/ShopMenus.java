@@ -36,7 +36,8 @@ public final class ShopMenus {
             RunManager.message(player, "The shop is closed on No Shop runs.", Formatting.RED);
             return;
         }
-        Menu menu = new Menu(Text.literal("Shop - " + state.money + " coins"), 6);
+        Menu menu = new Menu(Text.literal("Shop - " + state.money + " coins"), 6).layout(Menu.Layout.CARDS)
+                .screenTitle(Text.literal("Shop"));
         List<ShopCatalog.Category> categories = ShopCatalog.categories();
         for (int i = 0; i < categories.size() && i < CATEGORY_SLOTS.length; i++) {
             int index = i;
@@ -63,7 +64,8 @@ public final class ShopMenus {
         List<ShopCatalog.Entry> entries = category.items();
         int pages = Math.max(1, (entries.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         int current = Math.max(0, Math.min(page, pages - 1));
-        Menu menu = new Menu(Text.literal(category.name() + " - " + state.money + " coins"), 6);
+        Menu menu = new Menu(Text.literal(category.name() + " - " + state.money + " coins"), 6)
+                .screenTitle(Text.literal("Shop - " + category.name()));
 
         for (int slot = 0; slot < PAGE_SIZE; slot++) {
             int index = current * PAGE_SIZE + slot;
@@ -94,16 +96,16 @@ public final class ShopMenus {
                     (p, right) -> ShopService.buy(p, categoryIndex, entryIndex, right ? 5 : 1, current));
         }
         if (current > 0) {
-            menu.button(45, Menu.stack("minecraft:arrow", Text.literal("Previous page"), List.of()),
+            menu.footer(45, Menu.stack("minecraft:arrow", Text.literal("Previous page"), List.of()),
                     p -> category(p, categoryIndex, current - 1));
         }
         if (current < pages - 1) {
-            menu.button(53, Menu.stack("minecraft:arrow", Text.literal("Next page"), List.of()),
+            menu.footer(53, Menu.stack("minecraft:arrow", Text.literal("Next page"), List.of()),
                     p -> category(p, categoryIndex, current + 1));
         }
-        menu.icon(48, coins(state));
-        menu.button(49, Menu.stack("minecraft:oak_door", Text.literal("Back to shop"), List.of()), ShopMenus::shop);
-        menu.button(50, Menu.stack("minecraft:chest", Text.literal("Bag").formatted(Formatting.AQUA), List.of()), p -> bag(p, 0));
+        menu.icon(48, coins(state)).chestOnly(48);
+        menu.back(49, "Back to shop", ShopMenus::shop);
+        menu.footer(50, Menu.stack("minecraft:chest", Text.literal("Bag").formatted(Formatting.AQUA), List.of()), p -> bag(p, 0));
         menu.open(player);
     }
 
@@ -113,13 +115,18 @@ public final class ShopMenus {
         if (state == null) {
             return;
         }
-        Menu menu = new Menu(Text.literal("Bag - " + state.money + " coins"), 6);
+        Menu menu = new Menu(Text.literal("Bag - " + state.money + " coins"), 6).layout(Menu.Layout.GRID)
+                .screenTitle(Text.literal("Bag"));
+        boolean screen = Menu.usesScreen(player);
 
         List<Pokemon> party = CobblemonBridge.partyMembers(player);
         for (int i = 0; i < party.size() && i < 6; i++) {
             int index = i;
             Pokemon pokemon = party.get(i);
             ItemStack held = ItemBridge.held(pokemon);
+            if (screen && held.isEmpty()) {
+                continue; // the run screen already shows the party; only list held items to take back
+            }
             List<Text> lore = new ArrayList<>();
             lore.add(Text.literal("HP: " + pokemon.getCurrentHealth() + "/" + pokemon.getMaxHealth()));
             lore.add(Text.literal("Holding: " + (held.isEmpty() ? "nothing" : held.getName().getString())));
@@ -134,7 +141,7 @@ public final class ShopMenus {
                 Text.literal("Click an item, then a Pokémon to use or"),
                 Text.literal("give it. Click a Pokémon above to take"),
                 Text.literal("its held item back into the bag."),
-                Text.literal("Items stay in the run and are lost when it ends."))));
+                Text.literal("Items stay in the run and are lost when it ends.")))).chestOnly(8);
 
         List<Map.Entry<String, Integer>> items = new ArrayList<>(state.bag.entrySet());
         int pages = Math.max(1, (items.size() + BAG_PAGE_SIZE - 1) / BAG_PAGE_SIZE);
@@ -157,10 +164,10 @@ public final class ShopMenus {
                     p -> target(p, itemId));
         }
         if (current > 0) {
-            menu.button(45, Menu.stack("minecraft:arrow", Text.literal("Previous page"), List.of()), p -> bag(p, current - 1));
+            menu.footer(45, Menu.stack("minecraft:arrow", Text.literal("Previous page"), List.of()), p -> bag(p, current - 1));
         }
         if (current < pages - 1) {
-            menu.button(53, Menu.stack("minecraft:arrow", Text.literal("Next page"), List.of()), p -> bag(p, current + 1));
+            menu.footer(53, Menu.stack("minecraft:arrow", Text.literal("Next page"), List.of()), p -> bag(p, current + 1));
         }
         addFooter(menu, state, true);
         menu.open(player);
@@ -173,7 +180,7 @@ public final class ShopMenus {
         }
         boolean use = ShopCatalog.actionFor(itemId).equals(ShopCatalog.USE);
         ItemStack itemIcon = ItemBridge.stack(itemId);
-        Menu menu = new Menu(Text.literal((use ? "Use " : "Give ") + itemIcon.getName().getString() + " to..."));
+        Menu menu = new Menu(Text.literal((use ? "Use " : "Give ") + itemIcon.getName().getString() + " to...")).layout(Menu.Layout.CARDS);
         menu.icon(4, Menu.stack(itemIcon, Text.literal(itemIcon.getName().getString() + " x" + state.bagCount(itemId)), List.of()));
         List<Pokemon> party = CobblemonBridge.partyMembers(player);
         for (int i = 0; i < party.size() && i < 6; i++) {
@@ -187,18 +194,17 @@ public final class ShopMenus {
                             Text.literal(use ? "Click to use." : "Click to give (swaps its held item).").formatted(Formatting.YELLOW))),
                     p -> ShopService.apply(p, itemId, index));
         }
-        menu.button(22, Menu.stack("minecraft:oak_door", Text.literal("Back to bag"), List.of()), p -> bag(p, 0));
+        menu.back(22, "Back to bag", p -> bag(p, 0));
         menu.open(player);
     }
 
     private static void addFooter(Menu menu, RunState state, boolean inBag) {
-        menu.icon(48, coins(state));
-        menu.button(49, Menu.stack("minecraft:oak_door", Text.literal("Back to run"), List.of()),
-                p -> RunManager.get().openCurrent(p));
+        menu.icon(48, coins(state)).chestOnly(48);
+        menu.back(49, "Back to run", p -> RunManager.get().openCurrent(p));
         if (inBag) {
-            menu.button(50, Menu.stack("minecraft:emerald", Text.literal("Shop").formatted(Formatting.GREEN), List.of()), ShopMenus::shop);
+            menu.footer(50, Menu.stack("minecraft:emerald", Text.literal("Shop").formatted(Formatting.GREEN), List.of()), ShopMenus::shop);
         } else {
-            menu.button(50, Menu.stack("minecraft:chest", Text.literal("Bag").formatted(Formatting.AQUA), List.of()), p -> bag(p, 0));
+            menu.footer(50, Menu.stack("minecraft:chest", Text.literal("Bag").formatted(Formatting.AQUA), List.of()), p -> bag(p, 0));
         }
     }
 

@@ -1232,6 +1232,10 @@ public final class RunManager {
         if (!RogueConfig.get().prepDraft) {
             return;
         }
+        RunState draftRun = state(player);
+        if (draftRun == null || !Modifiers.has(draftRun, Modifiers.DRAFT)) {
+            return;
+        }
         RunState state = requireBossPrep(player, "draft");
         if (state == null || index < 0 || index >= state.draftOptions.size()) {
             return;

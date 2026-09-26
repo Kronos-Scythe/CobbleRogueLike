@@ -106,7 +106,7 @@ Hard bosses need a way to catch up, like Emerald Rogue's level-1 Chansey but wit
 - **Start routes:** the first `startRouteFloors` (2) floors turn trainer cards into routes (not in Solo), so you have a team before the first fight.
 - **Boss prep** on every gym, Elite Four and Champion preview, once each per boss and per player (co-op too), tracked in `prepUsed`:
   - **Train to level cap:** gives each run Pokémon exactly the EXP to reach the cap via `addExperienceWithPlayer`, so level-up moves, evolutions and the EXP screen behave normally.
-  - **Draft a counter:** pick 1 of `prepDraftOptions` (3) Pokémon at the cap whose type hits the boss's type super effectively (`TypeChart`), or any strong Pokémon for the Champion. No legendaries. A full team uses the per-player release screen (`coopPending`, now used in solo too).
+  - **Draft a counter** (only with the Counter Draft modifier, since it made every run too easy): pick 1 of `prepDraftOptions` (3) Pokémon at the cap whose type hits the boss's type super effectively (`TypeChart`), or any strong Pokémon for the Champion. No legendaries. A full team uses the per-player release screen (`coopPending`, now used in solo too).
   - **Full heal:** gyms and the Elite Four don't heal by default.
 
 ### Boss archetypes (hard, planned teams)
@@ -163,6 +163,7 @@ Chosen on a setup screen before the partner picker. Each adds a Rogue Token bonu
 | Hard | Enemies +2 levels (plus max AI, archetypes and a tier bonus even if the config is set easier) | +50% |
 | No Shop | The run shop is closed (the bag still works) | +25% |
 | All Doubles | Every trainer battle is a double battle | +25% |
+| Counter Draft | Boss prep adds "Draft a counter": 1 of 3 Pokémon at the cap that beat the boss's type | none |
 
 ### Move Tutor
 
@@ -297,7 +298,11 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
 
 - **Target:** Cobblemon 1.6.x on MC 1.21.1, Fabric (yarn mappings). All Cobblemon API calls live in `compat/CobblemonBridge` and `compat/CobblemonGuards`, so an API change only needs fixing there.
 - **Menus:** every screen is a `ui/Menu` (slots, icons, click actions), shown one of two ways:
-  - **Run screen** (client has the mod, `clientScreen: true`): `RogueViews` turns the menu plus the run into a `RogueView` (party with HP and held items, the partner's team in co-op, stats, a floor tower of the current segment with the gym on top, or the Elite Four and Champion), sent with `RogueNetwork.OpenView`. The client `RogueScreen` lists the menu's slots as rows (name, first lore line, full lore on hover) and the nav row (`Menu.navRow`) as bottom buttons. Clicks come back as `RogueNetwork.Click(viewId, slot, button)`; stale views are ignored. `Menu.close` / `Menu.isOpen` cover both kinds of screen.
+  - **Run screen** (client has the mod, `clientScreen: true`): `RogueViews` turns the menu plus the run into a `RogueView` (party with HP and held items, the partner's team in co-op, stats, a floor tower of the current segment with the gym on top, or the Elite Four and Champion), sent with `RogueNetwork.OpenView`. The client `RogueScreen` draws it:
+    - Each slot has a `Menu.Role`: CONTENT (the options), INFO (description boxes above them), FOOTER (nav row, page arrows, secondary actions) or BACK. By default clickable slots are content, others info, and the nav row is the footer.
+    - `Menu.Layout` picks how content is drawn: CARDS (a few big cards: hub, path, encounters, boss preview), GRID (icon tiles at their chest positions: partner picker, bag, invites), LIST (rows with a summary line: shop items, moves) or PAGE (text sections: How to play).
+    - Close is always bottom-left, Back bottom-right, footer buttons in between (icon-only when they don't fit).
+    - To avoid repeats, `Menu.chestOnly` hides slots the run screen already shows (coins, floor info, partner), and `Menu.screenTitle` gives shorter titles (no coin counts). How to play is only on the start page. Clicks come back as `RogueNetwork.Click(viewId, slot, button)`; stale views are ignored. `Menu.close` / `Menu.isOpen` cover both kinds of screen.
   - **Chest** (vanilla `GenericContainerScreenHandler` subclasses, `ui/MenuScreenHandler`): for clients without the mod. Clicks never move items.
   - **Biome theme:** each biome has a `block` (sand, snow, magma...). The run screen tiles it behind the stats and, on encounters, behind the wild Pokémon; chest encounters use it as filler.
 - **Battles (next):** build trainer actors programmatically and start them through the battle registry. Mark them as sanctioned so the battle guard lets them through.

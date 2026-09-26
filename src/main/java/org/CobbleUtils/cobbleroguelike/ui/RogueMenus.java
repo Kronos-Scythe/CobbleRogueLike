@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /** All run screens. Slots 11/13/15 hold the main choices and row 3 holds controls. */
 public final class RogueMenus {
@@ -31,17 +32,24 @@ public final class RogueMenus {
     private RogueMenus() {
     }
 
+    /**
+     * The start page. The run screen shows only the main choices as cards (Start a run, Co-op run,
+     * or Continue a saved run); How to play and the Rogue Shop are footer buttons.
+     */
     public static void hub(ServerPlayerEntity player, boolean confirmAbandon) {
-        Menu menu = new Menu(Text.literal("CobbleRogue"));
+        Menu menu = new Menu(Text.literal("CobbleRogue")).layout(Menu.Layout.CARDS);
         RunState saved = RunManager.isInRun(player) ? null : RunManager.get().savedRun(player);
+        Consumer<ServerPlayerEntity> backToHub = p -> hub(p, false);
         if (saved != null && confirmAbandon) {
-            menu.button(11, Menu.stack("minecraft:lime_concrete", Text.literal("Keep my saved run").formatted(Formatting.GREEN), List.of()),
-                    p -> hub(p, false));
+            menu.button(11, Menu.stack("minecraft:lime_concrete", Text.literal("Keep my saved run").formatted(Formatting.GREEN), List.of(
+                    Text.literal("Go back to the start page."))),
+                    backToHub);
             menu.button(15, Menu.stack("minecraft:red_concrete", Text.literal("Yes, end my saved run").formatted(Formatting.RED), List.of(
                     Text.literal("Its Pokémon will be lost."),
                     Text.literal("You still get Rogue Tokens for its progress."))),
                     p -> RunManager.get().abandonSaved(p));
         } else if (saved != null) {
+            menu.footer(11, guideButton(), p -> guide(p, backToHub));
             menu.button(13, Menu.stack("minecraft:compass", Text.literal("Continue saved run").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
                     Text.literal("Floor " + saved.floor + " - " + Biomes.get(saved.biome).name),
                     Text.literal(saved.badges + " badges, " + saved.money + " coins"),
@@ -49,38 +57,24 @@ public final class RogueMenus {
                     Text.literal(""),
                     Text.literal("Your real party is stored while you play.").formatted(Formatting.YELLOW))),
                     p -> RunManager.get().continueSaved(p));
-            menu.icon(11, guide());
-            menu.button(15, Menu.stack("minecraft:amethyst_shard", Text.literal("Rogue Shop").formatted(Formatting.LIGHT_PURPLE), List.of(
-                    Text.literal(RunManager.get().tokens(player) + " Rogue Tokens"),
-                    Text.literal("Spend tokens from past runs on real items."))),
-                    RewardMenus::shop);
-            menu.button(22, Menu.stack("minecraft:barrier", Text.literal("End saved run").formatted(Formatting.RED), List.of(
+            menu.footer(15, shopButton(player), RewardMenus::shop);
+            menu.footer(22, Menu.stack("minecraft:barrier", Text.literal("End saved run").formatted(Formatting.RED), List.of(
                     Text.literal("Asks for confirmation."))),
                     p -> hub(p, true));
         } else if (RunManager.get().inLobby(player)) {
+            menu.footer(11, guideButton(), p -> guide(p, backToHub));
             menu.button(13, Menu.stack("cobblemon:poke_ball", Text.literal("Pick your partner").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
                     Text.literal("You're in a co-op lobby."),
                     Text.literal("The run starts once you both picked."))),
                     p -> partnerPicker(p, 0));
-            menu.icon(11, guide());
-            menu.button(15, Menu.stack("minecraft:oak_door", Text.literal("Leave lobby").formatted(Formatting.RED), List.of()),
+            menu.button(15, Menu.stack("minecraft:oak_door", Text.literal("Leave lobby").formatted(Formatting.RED), List.of(
+                    Text.literal("Cancel the co-op run."))),
                     p -> {
                         RunManager.get().leaveLobby(p);
                         hub(p, false);
                     });
         } else if (!RunManager.isInRun(player)) {
-            String inviter = RunManager.get().pendingInviteFrom(player);
-            if (inviter != null) {
-                menu.button(22, Menu.stack("minecraft:player_head", Text.literal("Join " + inviter + "'s co-op run").formatted(Formatting.AQUA, Formatting.BOLD), List.of(
-                        Text.literal("You were invited to a co-op run!"),
-                        Text.literal("Click to accept."))),
-                        p -> RunManager.get().accept(p));
-            } else {
-                menu.button(22, Menu.stack("minecraft:player_head", Text.literal("Co-op run").formatted(Formatting.AQUA), List.of(
-                        Text.literal("Invite a friend: every battle is a 2 vs 2,"),
-                        Text.literal("each of you with up to " + Math.max(1, Math.min(6, RogueConfig.get().coopPartyLimit)) + " Pokémon."))),
-                        RogueMenus::invite);
-            }
+            menu.footer(11, guideButton(), p -> guide(p, backToHub));
             menu.button(13, Menu.stack("cobblemon:poke_ball", Text.literal("Start a run").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
                     Text.literal("Pick one of your own Pokémon as your"),
                     Text.literal("only partner and build a team as you go."),
@@ -88,13 +82,22 @@ public final class RogueMenus {
                     Text.literal("Your real party is stored safely").formatted(Formatting.YELLOW),
                     Text.literal("and given back when the run ends.").formatted(Formatting.YELLOW))),
                     p -> RunManager.get().start(p));
-            menu.icon(11, guide());
-            menu.button(15, Menu.stack("minecraft:amethyst_shard", Text.literal("Rogue Shop").formatted(Formatting.LIGHT_PURPLE), List.of(
-                    Text.literal(RunManager.get().tokens(player) + " Rogue Tokens"),
-                    Text.literal("Spend tokens from past runs on real items."))),
-                    RewardMenus::shop);
+            menu.footer(15, shopButton(player), RewardMenus::shop);
+            String inviter = RunManager.get().pendingInviteFrom(player);
+            if (inviter != null) {
+                menu.button(22, Menu.stack("minecraft:player_head", Text.literal("Join " + inviter + "'s co-op run").formatted(Formatting.AQUA, Formatting.BOLD), List.of(
+                        Text.literal("You were invited to a co-op run!"),
+                        Text.literal("Click to accept."))),
+                        p -> RunManager.get().accept(p));
+            } else {
+                menu.button(22, Menu.stack("minecraft:player_head", Text.literal("Co-op run").formatted(Formatting.AQUA, Formatting.BOLD), List.of(
+                        Text.literal("Invite a friend: every battle is a 2 vs 2,"),
+                        Text.literal("each of you with up to " + Math.max(1, Math.min(6, RogueConfig.get().coopPartyLimit)) + " Pokémon."))),
+                        RogueMenus::invite);
+            }
         } else if (confirmAbandon) {
-            menu.button(11, Menu.stack("minecraft:lime_concrete", Text.literal("Keep playing").formatted(Formatting.GREEN), List.of()),
+            menu.button(11, Menu.stack("minecraft:lime_concrete", Text.literal("Keep playing").formatted(Formatting.GREEN), List.of(
+                    Text.literal("Back to your run."))),
                     p -> RunManager.get().openCurrent(p));
             RunState ending = RunManager.get().state(player);
             menu.button(15, Menu.stack("minecraft:red_concrete", Text.literal("Yes, end my run").formatted(Formatting.RED), List.of(
@@ -106,27 +109,86 @@ public final class RogueMenus {
             menu.button(11, Menu.stack("minecraft:compass", Text.literal("Continue").formatted(Formatting.GREEN), List.of(
                     Text.literal("Floor " + state.floor))),
                     p -> RunManager.get().openCurrent(p));
-            menu.button(15, Menu.stack("minecraft:barrier", Text.literal("End run").formatted(Formatting.RED), List.of()),
+            menu.button(15, Menu.stack("minecraft:barrier", Text.literal("End run").formatted(Formatting.RED), List.of(
+                    Text.literal("Asks for confirmation."))),
                     p -> hub(p, true));
         }
+        menu.open(player);
+    }
+
+    private static ItemStack guideButton() {
+        return Menu.stack("minecraft:book", Text.literal("How to play").formatted(Formatting.WHITE), List.of(
+                Text.literal("Rules, bosses, co-op and commands.")));
+    }
+
+    private static ItemStack shopButton(ServerPlayerEntity player) {
+        return Menu.stack("minecraft:amethyst_shard", Text.literal("Rogue Shop").formatted(Formatting.LIGHT_PURPLE), List.of(
+                Text.literal(RunManager.get().tokens(player) + " Rogue Tokens"),
+                Text.literal("Spend tokens from past runs on real items.")));
+    }
+
+    /** The How to play page. {@code back} returns to wherever it was opened from. */
+    public static void guide(ServerPlayerEntity player, Consumer<ServerPlayerEntity> back) {
+        RogueConfig config = RogueConfig.get();
+        Menu menu = new Menu(Text.literal("How to play")).layout(Menu.Layout.PAGE);
+        List<ItemStack> sections = List.of(
+                Menu.stack("cobblemon:poke_ball", Text.literal("Your run").formatted(Formatting.GREEN), List.of(
+                        Text.literal("Pick one of your own Pokémon from your party or PC. A copy joins the run at Lv. "
+                                + config.starterLevel + ", and that's your whole team to start."),
+                        Text.literal("Your real Pokémon are stored safely and never gain EXP, evolve or change."))),
+                Menu.stack("minecraft:filled_map", Text.literal("Path cards").formatted(Formatting.AQUA), List.of(
+                        Text.literal("Each floor, pick one of 3 cards:"),
+                        Text.literal("Route: add a wild Pokémon from the current biome."),
+                        Text.literal("Trainer: a battle that pays coins."),
+                        Text.literal("Rest stop: fully heal your team."),
+                        Text.literal("Legendary: beat it and it joins you (rare)."))),
+                Menu.stack("minecraft:gold_block", Text.literal("Gyms and the Champion").formatted(Formatting.GOLD), List.of(
+                        Text.literal("Every " + config.gymEvery + "th floor is a gym. Each badge raises the level cap."),
+                        Text.literal("After " + config.gymCount + " badges come the Elite Four and the Champion. Beat them to win."))),
+                Menu.stack("minecraft:writable_book", Text.literal("Boss prep").formatted(Formatting.YELLOW), List.of(
+                        Text.literal("Before every boss, once each: train your team to the level cap, draft a counter Pokémon, or fully heal."))),
+                Menu.stack("minecraft:emerald", Text.literal("Coins, Shop and Bag").formatted(Formatting.GREEN), List.of(
+                        Text.literal("Coins from battles buy healing, held items, mints and more in the run Shop."),
+                        Text.literal("The Bag uses items and moves held items between your Pokémon. The Move Tutor teaches moves."))),
+                Menu.stack("minecraft:skeleton_skull", Text.literal("Losing").formatted(Formatting.RED), List.of(
+                        Text.literal("Losing or forfeiting a battle ends the run. You always earn Rogue Tokens for how far you got."),
+                        Text.literal("Spend them on real items in the Rogue Shop on the start page."))),
+                Menu.stack("minecraft:player_head", Text.literal("Co-op").formatted(Formatting.AQUA), List.of(
+                        Text.literal("Invite a friend: every battle is a 2 vs 2, and each of you keeps up to "
+                                + Math.max(1, Math.min(6, config.coopPartyLimit)) + " Pokémon."),
+                        Text.literal("Floors, badges and coins are shared. Both press Ready to start a battle."))),
+                Menu.stack("minecraft:ender_chest", Text.literal("Saving").formatted(Formatting.YELLOW), List.of(
+                        Text.literal("Save & leave between battles to get your real party back. Continue later from /rogue."))),
+                Menu.stack("minecraft:command_block", Text.literal("Commands").formatted(Formatting.GRAY), List.of(
+                        Text.literal("/rogue, /rogue shop, /rogue save, /rogue tutor, /rogue invite <player>"),
+                        Text.literal("/rogue end, /rogue endbattle (stuck battles), /rogue clean"))));
+        for (int i = 0; i < sections.size() && i < 9; i++) {
+            menu.icon(9 + i, sections.get(i));
+            menu.role(9 + i, Menu.Role.CONTENT);
+        }
+        menu.back(22, "Back", back);
         menu.open(player);
     }
 
     /** Run setup: toggle modifiers, then go on to pick a partner. */
     public static void setup(ServerPlayerEntity player) {
         Set<String> chosen = RunManager.get().pendingModifiers(player);
-        Menu menu = new Menu(Text.literal("New run - modifiers"));
-        int[] slots = {10, 11, 12, 13, 14};
+        Menu menu = new Menu(Text.literal("New run - modifiers")).layout(Menu.Layout.CARDS);
+        int[] slots = {10, 11, 12, 13, 14, 15};
         for (int i = 0; i < Modifiers.ALL.size() && i < slots.length; i++) {
             Modifiers.Info info = Modifiers.ALL.get(i);
             boolean on = chosen.contains(info.id());
             List<Text> lore = new ArrayList<>();
             lore.add(Text.literal(info.description()));
-            lore.add(Text.literal("+" + Math.round(Modifiers.bonus(info.id()) * 100) + "% Rogue Tokens").formatted(Formatting.LIGHT_PURPLE));
+            long bonus = Math.round(Modifiers.bonus(info.id()) * 100);
+            lore.add(bonus == 0 ? Text.literal("No token bonus").formatted(Formatting.DARK_GRAY)
+                    : Text.literal((bonus > 0 ? "+" : "") + bonus + "% Rogue Tokens").formatted(Formatting.LIGHT_PURPLE));
             lore.add(on ? Text.literal("ON - click to turn off").formatted(Formatting.GREEN)
                     : Text.literal("OFF - click to turn on").formatted(Formatting.GRAY));
-            ItemStack icon = on ? Menu.stack(info.icon(), Text.literal(""), List.of())
-                    : Menu.stack("minecraft:gray_dye", Text.literal(""), List.of());
+            ItemStack icon = Menu.stack(info.icon(), Text.literal(""), List.of());
+            if (on) {
+                icon.set(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true); // glows while on
+            }
             menu.button(slots[i], Menu.stack(icon, Text.literal(info.name()).formatted(on ? Formatting.GOLD : Formatting.WHITE), lore),
                     p -> RunManager.get().toggleModifier(p, info.id()));
         }
@@ -136,7 +198,8 @@ public final class RogueMenus {
         menu.button(16, Menu.stack("cobblemon:poke_ball", Text.literal("Choose your partner").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
                 Text.literal("Continue to the partner picker."))),
                 p -> partnerPicker(p, 0));
-        menu.button(22, Menu.stack("minecraft:oak_door", Text.literal("Back"), List.of()), p -> hub(p, false));
+        menu.role(16, Menu.Role.FOOTER);
+        menu.back(22, "Back", p -> hub(p, false));
         menu.open(player);
     }
 
@@ -156,7 +219,8 @@ public final class RogueMenus {
 
         int pages = Math.max(1, (all.size() + PICKER_PAGE_SIZE - 1) / PICKER_PAGE_SIZE);
         int current = Math.max(0, Math.min(page, pages - 1));
-        Menu menu = new Menu(Text.literal("Choose your partner (" + (current + 1) + "/" + pages + ")"), 6);
+        Menu menu = new Menu(Text.literal("Choose your partner (" + (current + 1) + "/" + pages + ")"), 6)
+                .layout(Menu.Layout.GRID);
 
         RogueConfig config = RogueConfig.get();
         for (int slot = 0; slot < PICKER_PAGE_SIZE; slot++) {
@@ -189,7 +253,7 @@ public final class RogueMenus {
             menu.icon(22, Menu.stack("minecraft:barrier", Text.literal("You don't have any Pokémon").formatted(Formatting.RED), List.of()));
         }
         if (current > 0) {
-            menu.button(45, Menu.stack("minecraft:arrow", Text.literal("Previous page"), List.of()),
+            menu.footer(45, Menu.stack("minecraft:arrow", Text.literal("Previous page"), List.of()),
                     p -> partnerPicker(p, current - 1));
         }
         menu.icon(49, Menu.stack("minecraft:book", Text.literal("Pick your partner").formatted(Formatting.WHITE), List.of(
@@ -198,14 +262,23 @@ public final class RogueMenus {
                 Text.literal("Your real Pokémon never gains EXP,"),
                 Text.literal("evolves or changes during a run."))));
         if (current < pages - 1) {
-            menu.button(53, Menu.stack("minecraft:arrow", Text.literal("Next page"), List.of()),
+            menu.footer(53, Menu.stack("minecraft:arrow", Text.literal("Next page"), List.of()),
                     p -> partnerPicker(p, current + 1));
         }
+        // A co-op lobby comes from the start page, a solo run from the modifiers.
+        menu.back(48, "Back", p -> {
+            if (RunManager.get().inLobby(p)) {
+                hub(p, false);
+            } else {
+                setup(p);
+            }
+        });
         menu.open(player);
     }
 
     public static void path(ServerPlayerEntity player, RunState state) {
-        Menu menu = new Menu(Text.literal("Floor " + state.floor + " - " + Biomes.get(state.biome).name), RUN_ROWS);
+        Menu menu = new Menu(Text.literal("Floor " + state.floor + " - " + Biomes.get(state.biome).name), RUN_ROWS)
+                .layout(Menu.Layout.CARDS).screenTitle(Text.literal("Choose your path"));
         for (int i = 0; i < state.nodeChoices.size() && i < CHOICE_SLOTS.length; i++) {
             int index = i;
             RunState.NodeType node = state.nodeChoices.get(i);
@@ -257,7 +330,7 @@ public final class RogueMenus {
     }
 
     public static void battle(ServerPlayerEntity player, RunState state) {
-        Menu menu = new Menu(Text.literal(state.battleName), RUN_ROWS);
+        Menu menu = new Menu(Text.literal(state.battleName), RUN_ROWS).layout(Menu.Layout.CARDS);
         String icon = switch (state.battleKind) {
             case GYM -> "minecraft:gold_block";
             case ELITE -> "minecraft:amethyst_block";
@@ -340,6 +413,7 @@ public final class RogueMenus {
         menu.icon(1, Menu.stack("minecraft:writable_book", Text.literal("Boss prep").formatted(Formatting.GOLD), List.of(
                 Text.literal("Free help before this fight,"),
                 Text.literal("once each per boss."))));
+        menu.chestOnly(1); // on the run screen the prep options speak for themselves
         if (config.prepTrainToCap) {
             boolean used = RunManager.prepUsed(state, player, "train");
             menu.button(3, Menu.stack(used ? "minecraft:gray_dye" : "cobblemon:exp_candy_xl",
@@ -349,7 +423,7 @@ public final class RogueMenus {
                             used ? Text.literal("Used").formatted(Formatting.GRAY) : Text.literal("Click to train").formatted(Formatting.YELLOW))),
                     p -> RunManager.get().prepTrain(p));
         }
-        if (config.prepDraft && !state.draftOptions.isEmpty()) {
+        if (config.prepDraft && Modifiers.has(state, Modifiers.DRAFT) && !state.draftOptions.isEmpty()) {
             boolean used = RunManager.prepUsed(state, player, "draft");
             menu.button(4, Menu.stack(used ? "minecraft:gray_dye" : "cobblemon:great_ball",
                     Text.literal("Draft a counter").formatted(used ? Formatting.GRAY : Formatting.AQUA), List.of(
@@ -374,7 +448,7 @@ public final class RogueMenus {
         if (state == null) {
             return;
         }
-        Menu menu = new Menu(Text.literal("Draft a counter"), RUN_ROWS);
+        Menu menu = new Menu(Text.literal("Draft a counter"), RUN_ROWS).layout(Menu.Layout.CARDS);
         for (int i = 0; i < state.draftOptions.size() && i < CHOICE_SLOTS.length; i++) {
             int index = i;
             String properties = state.draftOptions.get(i);
@@ -383,8 +457,7 @@ public final class RogueMenus {
                     Text.literal("Click to draft.").formatted(Formatting.YELLOW))),
                     p -> RunManager.get().prepDraft(p, index));
         }
-        menu.button(22, Menu.stack("minecraft:oak_door", Text.literal("Back").formatted(Formatting.GRAY), List.of()),
-                p -> RunManager.get().openCurrent(p));
+        menu.back(22, "Back", p -> RunManager.get().openCurrent(p));
         addControls(menu, state, player.getUuid());
         menu.open(player);
     }
@@ -407,7 +480,7 @@ public final class RogueMenus {
     }
 
     public static void encounter(ServerPlayerEntity player, RunState state) {
-        Menu menu = new Menu(Text.literal("Wild Pokémon appeared!"), RUN_ROWS);
+        Menu menu = new Menu(Text.literal("Wild Pokémon appeared!"), RUN_ROWS).layout(Menu.Layout.CARDS);
         String block = Biomes.block(state.biome);
         menu.filler(block).theme(block, true);
         UUID id = player.getUuid();
@@ -437,7 +510,8 @@ public final class RogueMenus {
                     Text.literal(RunManager.get().partnerName(state, id) + (done ? " has picked" : " is choosing...")).formatted(done ? Formatting.GREEN : Formatting.GRAY),
                     List.of()));
         }
-        menu.button(22, Menu.stack("minecraft:oak_door", Text.literal("Skip").formatted(Formatting.GRAY), List.of()),
+        menu.button(22, Menu.stack("minecraft:oak_door", Text.literal("Skip").formatted(Formatting.GRAY), List.of(
+                Text.literal("Take nothing and move on."))),
                 p -> RunManager.get().chooseEncounter(p, -1));
         addControls(menu, state, id);
         menu.open(player);
@@ -445,7 +519,7 @@ public final class RogueMenus {
 
     /** Co-op legendary win: one player takes the legendary, the other gets its companion. */
     public static void claim(ServerPlayerEntity player, RunState state) {
-        Menu menu = new Menu(Text.literal("Split the reward"), RUN_ROWS);
+        Menu menu = new Menu(Text.literal("Split the reward"), RUN_ROWS).layout(Menu.Layout.CARDS);
         String partner = RunManager.get().partnerName(state, player.getUuid());
         menu.icon(4, Menu.stack("minecraft:nether_star", Text.literal("You won!").formatted(Formatting.LIGHT_PURPLE), List.of(
                 Text.literal("One of you takes the legendary,"),
@@ -467,7 +541,7 @@ public final class RogueMenus {
     }
 
     public static void release(ServerPlayerEntity player, RunState state, String pending) {
-        Menu menu = new Menu(Text.literal("Party full - release one?"), RUN_ROWS);
+        Menu menu = new Menu(Text.literal("Party full - release one?"), RUN_ROWS).layout(Menu.Layout.CARDS);
         menu.icon(4, Menu.stack(speciesIcon(pending), Text.literal("New: " + describeProperties(pending)).formatted(Formatting.AQUA), List.of(
                 Text.literal("Party limit: " + RunManager.partyLimit(state)))));
         List<Pokemon> party = CobblemonBridge.partyMembers(player);
@@ -478,7 +552,8 @@ public final class RogueMenus {
                     Text.literal("to make room."))),
                     p -> RunManager.get().releaseForPending(p, index));
         }
-        menu.button(22, Menu.stack("minecraft:oak_door", Text.literal("Keep my party").formatted(Formatting.GRAY), List.of()),
+        menu.button(22, Menu.stack("minecraft:oak_door", Text.literal("Keep my party").formatted(Formatting.GRAY), List.of(
+                Text.literal("Let the new Pokémon go."))),
                 p -> RunManager.get().releaseForPending(p, -1));
         addControls(menu, state, player.getUuid());
         menu.open(player);
@@ -488,8 +563,9 @@ public final class RogueMenus {
     private static final int NAV_ROW = 3;
 
     /**
-     * The nav bar on every run screen (bottom row): run info, then Shop, Bag, Move Tutor and the
-     * Rogue Shop, a guide, and End run. The rows above hold the screen's own content.
+     * The nav bar on every run screen (bottom row): run info, then Shop, Bag, Move Tutor, Save &
+     * leave and End run. The rows above hold the screen's own content. How to play is only on the
+     * start page.
      */
     private static void addControls(Menu menu, RunState state, UUID viewer) {
         RogueConfig config = RogueConfig.get();
@@ -531,20 +607,20 @@ public final class RogueMenus {
                     Text.literal("Party limit: " + RunManager.partyLimit(state) + " each"),
                     Text.literal("Log off any time; the run waits for you."),
                     Text.literal("Save & leave isn't available in co-op.").formatted(Formatting.DARK_GRAY))));
+            menu.chestOnly(base + 5); // the run screen shows the partner in the stats
         } else {
             menu.button(base + 5, Menu.stack("minecraft:ender_chest", Text.literal("Save & leave").formatted(Formatting.YELLOW), List.of(
                     Text.literal("Put the run away and get your real"),
                     Text.literal("party back. Continue any time from /rogue."))),
                     p -> RunManager.get().saveAndLeave(p));
         }
-        menu.icon(base + 6, guide());
         menu.button(base + 8, Menu.stack("minecraft:barrier", Text.literal("End run").formatted(Formatting.RED), List.of(
                 Text.literal("Asks for confirmation."))), p -> hub(p, true));
     }
 
     /** Pick an online player to invite to a co-op run. */
     public static void invite(ServerPlayerEntity player) {
-        Menu menu = new Menu(Text.literal("Invite a friend"), 6);
+        Menu menu = new Menu(Text.literal("Invite a friend"), 6).layout(Menu.Layout.GRID);
         int slot = 0;
         for (ServerPlayerEntity other : player.getServer().getPlayerManager().getPlayerList()) {
             if (other == player || slot >= 45) {
@@ -569,28 +645,12 @@ public final class RogueMenus {
                 Text.literal("Routes: each of you takes a different Pokémon."),
                 Text.literal("Coins, floors and badges are shared."),
                 Text.literal("Or use /rogue invite <player>.").formatted(Formatting.DARK_GRAY))));
-        menu.button(49, Menu.stack("minecraft:oak_door", Text.literal("Back"), List.of()), p -> hub(p, false));
-        menu.button(50, Menu.stack("minecraft:netherite_sword", Text.literal("Run modifiers").formatted(Formatting.GOLD), List.of(
+        menu.back(49, "Back", p -> hub(p, false));
+        menu.footer(50, Menu.stack("minecraft:netherite_sword", Text.literal("Run modifiers").formatted(Formatting.GOLD), List.of(
                 Text.literal("As the host, your modifiers apply"),
                 Text.literal("to the co-op run. Set them, then come"),
                 Text.literal("back here to invite."))), RogueMenus::setup);
         menu.open(player);
-    }
-
-    /** A short how-to-play book shown on the hub and in the nav bar. */
-    private static ItemStack guide() {
-        return Menu.stack("minecraft:book", Text.literal("How to play").formatted(Formatting.WHITE), List.of(
-                Text.literal("Pick a path card each floor: routes add"),
-                Text.literal("Pokémon, trainers pay coins, rests heal."),
-                Text.literal("Every 5th floor is a gym; after 8 badges"),
-                Text.literal("come the Elite Four and the Champion."),
-                Text.literal("Losing ends the run, but you always earn"),
-                Text.literal("Rogue Tokens for /rogue shop."),
-                Text.literal(""),
-                Text.literal("Save & leave any time and continue later."),
-                Text.literal(""),
-                Text.literal("Commands: /rogue, /rogue save, /rogue tutor,").formatted(Formatting.DARK_GRAY),
-                Text.literal("/rogue shop, /rogue end, /rogue endbattle, /rogue clean").formatted(Formatting.DARK_GRAY)));
     }
 
     /** Model icon matching the property string (form, shiny...), falling back to a Poké Ball. */

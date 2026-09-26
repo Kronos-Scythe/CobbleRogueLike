@@ -5,7 +5,7 @@ import org.CobbleUtils.cobbleroguelike.RogueConfig;
 import java.util.List;
 import java.util.Set;
 
-/** Optional run rules, chosen before a run, each adding a Rogue Token bonus. */
+/** Optional run rules, chosen before a run. Harder ones add a Rogue Token bonus. */
 public final class Modifiers {
 
     public static final String NUZLOCKE = "nuzlocke";
@@ -13,16 +13,18 @@ public final class Modifiers {
     public static final String HARD = "hard";
     public static final String NO_SHOP = "noshop";
     public static final String ALL_DOUBLES = "alldoubles";
+    public static final String DRAFT = "draft";
 
     public record Info(String id, String name, String icon, String description) {
     }
 
     public static final List<Info> ALL = List.of(
-            new Info(NUZLOCKE, "Nuzlocke", "minecraft:skeleton_skull", "Pokémon that faint are gone for good."),
-            new Info(SOLO, "Solo", "minecraft:totem_of_undying", "Only your partner: routes give no Pokémon, and legendaries pay coins instead of joining."),
-            new Info(HARD, "Hard", "minecraft:netherite_sword", "Every trainer is 2 levels higher (on top of the config difficulty)."),
-            new Info(NO_SHOP, "No Shop", "minecraft:barrier", "The run shop is closed."),
-            new Info(ALL_DOUBLES, "All Doubles", "minecraft:iron_sword", "Every trainer battle is a double battle."));
+            new Info(NUZLOCKE, "Nuzlocke", "cobblemon:reaper_cloth", "Pokémon that faint are gone for good."),
+            new Info(SOLO, "Solo", "cobblemon:friend_ball", "Only your partner: routes give no Pokémon, and legendaries pay coins instead of joining."),
+            new Info(HARD, "Hard", "cobblemon:life_orb", "Every trainer is 2 levels higher (on top of the config difficulty)."),
+            new Info(NO_SHOP, "No Shop", "cobblemon:relic_coin_pouch", "The run shop is closed."),
+            new Info(ALL_DOUBLES, "All Doubles", "pokemon:doduo", "Every trainer battle is a double battle."),
+            new Info(DRAFT, "Counter Draft", "cobblemon:great_ball", "Before each boss, draft 1 of 3 Pokémon at the level cap that counter its type."));
 
     private Modifiers() {
     }
@@ -40,6 +42,7 @@ public final class Modifiers {
             case HARD -> config.hardTokenBonus;
             case NO_SHOP -> config.noShopTokenBonus;
             case ALL_DOUBLES -> config.allDoublesTokenBonus;
+            case DRAFT -> config.draftTokenBonus;
             default -> 0.0;
         };
     }
