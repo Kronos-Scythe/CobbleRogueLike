@@ -76,6 +76,8 @@ public final class RunState {
     public boolean battleDoubles = false;
     /** Gimmick the boss will use ("mega", "tera" or empty; Mega Showdown only). */
     public String battleGimmick = "";
+    /** Team style of the upcoming boss, e.g. "Rain" or "Trick Room" (empty for a plain team). */
+    public String battleArchetype = "";
 
     public RunState(UUID playerId, long seed) {
         this.playerId = playerId;
@@ -131,6 +133,7 @@ public final class RunState {
         battleSkill = 0;
         battleDoubles = false;
         battleGimmick = "";
+        battleArchetype = "";
     }
 
     public NbtCompound toNbt() {
@@ -176,6 +179,7 @@ public final class RunState {
         tag.putInt("battleSkill", battleSkill);
         tag.putBoolean("battleDoubles", battleDoubles);
         tag.putString("battleGimmick", battleGimmick);
+        tag.putString("battleArchetype", battleArchetype);
         return tag;
     }
 
@@ -232,6 +236,7 @@ public final class RunState {
         state.battleSkill = tag.getInt("battleSkill");
         state.battleDoubles = tag.getBoolean("battleDoubles");
         state.battleGimmick = tag.getString("battleGimmick");
+        state.battleArchetype = tag.getString("battleArchetype");
         return state;
     }
 

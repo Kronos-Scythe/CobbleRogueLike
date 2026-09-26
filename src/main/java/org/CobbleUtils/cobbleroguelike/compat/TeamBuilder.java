@@ -50,6 +50,25 @@ public final class TeamBuilder {
             "recover", "roost", "softboiled", "slackoff", "moonlight", "synthesis", "willowisp", "thunderwave",
             "spore", "toxic", "stealthrock", "protect");
 
+    /**
+     * Role instructions from an archetype (see {@link ArchetypeBuilder}); every field is optional.
+     *
+     * @param ability         forced ability, e.g. "drizzle"
+     * @param requiredMoves   moves the set must contain if the Pokémon can learn them (e.g. "raindance")
+     * @param item            preferred held item (item clause still applies)
+     * @param nature          forced nature
+     * @param zeroSpeed       Trick Room: 0 Speed IVs, no Speed EVs, speed-lowering nature
+     * @param typeMultipliers move score multipliers by type (rain: water x1.5, fire x0.5)
+     * @param boostedMoves    moves that get much better in this team (thunder in rain)
+     * @param unbanned        normally excluded moves that are fine here (solarbeam in sun)
+     */
+    public record SetPlan(String ability, List<String> requiredMoves, String item, String nature, boolean zeroSpeed,
+                          Map<String, Double> typeMultipliers, Set<String> boostedMoves, Set<String> unbanned) {
+        public static SetPlan empty() {
+            return new SetPlan(null, List.of(), null, null, false, Map.of(), Set.of(), Set.of());
+        }
+    }
+
     private TeamBuilder() {
     }
 
@@ -59,6 +78,11 @@ public final class TeamBuilder {
      */
     public static String build(String properties, int tier, boolean doubles, boolean giveItem,
                                Set<String> usedItems, Random random) {
+        return build(properties, tier, doubles, giveItem, usedItems, random, SetPlan.empty());
+    }
+
+    public static String build(String properties, int tier, boolean doubles, boolean giveItem,
+                               Set<String> usedItems, Random random, SetPlan plan) {
         Pokemon pokemon;
         try {
             pokemon = PokemonProperties.Companion.parse(properties).create();
@@ -88,11 +112,26 @@ public final class TeamBuilder {
             candidates.addAll(learnset.getLegacyMoves());
         }
 
-        String item = giveItem ? pickItem(physical, bulky, spe, doubles, !form.getEvolutions().isEmpty(), usedItems, random) : null;
+        String item = null;
+        if (plan.item() != null && ItemBridge.exists(plan.item()) && !usedItems.contains(plan.item())) {
+            item = plan.item();
+        } else if (giveItem) {
+            item = pickItem(physical, bulky, spe, doubles, !form.getEvolutions().isEmpty(), usedItems, random);
+        }
+        // Choice items don't mix with required utility moves (setters, Fake Out...).
+        if (item != null && item.contains("choice_") && !plan.requiredMoves().isEmpty()) {
+            item = doubles ? "cobblemon:sitrus_berry" : "cobblemon:leftovers";
+            if (usedItems.contains(item)) {
+                item = null;
+            }
+        }
         boolean choiceLocked = item != null && item.contains("choice_");
 
-        List<String> moves = pickMoves(candidates, types, physical, doubles, tier, choiceLocked);
+        List<String> moves = pickMoves(candidates, types, physical, doubles, tier, choiceLocked, plan);
         StringBuilder result = new StringBuilder(properties);
+        if (plan.ability() != null) {
+            result.append(" ability=").append(plan.ability());
+        }
         if (!moves.isEmpty()) {
             result.append(" moves=").append(String.join(",", moves));
         }
@@ -100,39 +139,62 @@ public final class TeamBuilder {
             result.append(" held_item=").append(item);
             usedItems.add(item);
         }
-        if (tier >= 1) {
-            result.append(" nature=").append(physical ? (spe >= 80 && !bulky ? "jolly" : "adamant") : (spe >= 80 && !bulky ? "timid" : "modest"));
-            result.append(" hp_iv=31 attack_iv=31 defence_iv=31 special_attack_iv=31 special_defence_iv=31 speed_iv=31");
+        if (tier >= 1 || plan.nature() != null || plan.zeroSpeed()) {
+            String nature = plan.nature() != null ? plan.nature()
+                    : plan.zeroSpeed() ? (physical ? "brave" : "quiet")
+                    : physical ? (spe >= 80 && !bulky ? "jolly" : "adamant") : (spe >= 80 && !bulky ? "timid" : "modest");
+            result.append(" nature=").append(nature);
+        }
+        if (tier >= 1 || plan.zeroSpeed()) {
+            result.append(" hp_iv=31 attack_iv=31 defence_iv=31 special_attack_iv=31 special_defence_iv=31 speed_iv=")
+                    .append(plan.zeroSpeed() ? 0 : 31);
         }
         if (tier >= 2) {
             String attackEv = physical ? "attack_ev=252" : "special_attack_ev=252";
-            result.append(bulky ? " hp_ev=252 " + attackEv + " defence_ev=4" : " speed_ev=252 " + attackEv + " hp_ev=4");
+            result.append(bulky || plan.zeroSpeed() ? " hp_ev=252 " + attackEv + " defence_ev=4" : " speed_ev=252 " + attackEv + " hp_ev=4");
         }
         return result.toString();
     }
 
     private static List<String> pickMoves(Set<MoveTemplate> candidates, Set<String> types, boolean physical,
-                                          boolean doubles, int tier, boolean choiceLocked) {
+                                          boolean doubles, int tier, boolean choiceLocked, SetPlan plan) {
+        Set<String> learnable = new HashSet<>();
+        candidates.forEach(move -> learnable.add(move.getName()));
+        List<String> chosen = new ArrayList<>();
+        Set<String> chosenTypes = new HashSet<>();
+        // Role moves first (weather/terrain/room setters, Fake Out, redirection...).
+        for (String required : plan.requiredMoves()) {
+            if (chosen.size() < 4 && learnable.contains(required) && !chosen.contains(required)) {
+                chosen.add(required);
+            }
+        }
         List<MoveTemplate> attacks = new ArrayList<>();
         for (MoveTemplate move : candidates) {
-            if (!move.getDamageCategory().getName().equals("status") && move.getPower() > 0 && !BANNED.contains(move.getName())) {
+            boolean allowed = !BANNED.contains(move.getName()) || plan.unbanned().contains(move.getName());
+            if (!move.getDamageCategory().getName().equals("status") && move.getPower() > 0 && allowed
+                    && !chosen.contains(move.getName())) {
                 attacks.add(move);
             }
         }
-        List<String> chosen = new ArrayList<>();
-        Set<String> chosenTypes = new HashSet<>();
-        int attackSlots = tier >= 1 && !choiceLocked ? 3 : 4;
-        while (chosen.size() < attackSlots && !attacks.isEmpty()) {
+        int attackSlots = Math.max(1, (tier >= 1 && !choiceLocked && chosen.isEmpty() ? 3 : 4) - chosen.size());
+        attackSlots = Math.min(attackSlots, 4 - chosen.size());
+        int attacksChosen = 0;
+        while (attacksChosen < attackSlots && chosen.size() < 4 && !attacks.isEmpty()) {
             MoveTemplate best = null;
             double bestScore = -1;
             for (MoveTemplate move : attacks) {
                 String type = move.getElementalType().getName().toLowerCase(Locale.ROOT);
                 double accuracy = move.getAccuracy() <= 0 ? 1.0 : move.getAccuracy() / 100.0;
+                String target = move.getTarget().name();
+                boolean spread = target.equals("allAdjacent") || target.equals("allAdjacentFoes");
                 double score = move.getPower() * accuracy
                         * (types.contains(type) ? 1.5 : 1.0)
                         * (move.getDamageCategory().getName().equals(physical ? "physical" : "special") ? 1.0 : 0.55)
                         * (chosenTypes.contains(type) ? 0.45 : 1.0)
-                        * (move.getPriority() > 0 ? 1.1 : 1.0);
+                        * (move.getPriority() > 0 ? 1.1 : 1.0)
+                        * (doubles && spread ? 1.25 : 1.0)
+                        * plan.typeMultipliers().getOrDefault(type, 1.0)
+                        * (plan.boostedMoves().contains(move.getName()) ? 1.4 : 1.0);
                 if (score > bestScore) {
                     bestScore = score;
                     best = move;
@@ -144,12 +206,11 @@ public final class TeamBuilder {
             attacks.remove(best);
             chosen.add(best.getName());
             chosenTypes.add(best.getElementalType().getName().toLowerCase(Locale.ROOT));
+            attacksChosen++;
         }
         if (chosen.size() < 4 && tier >= 1 && !choiceLocked) {
-            Set<String> names = new HashSet<>();
-            candidates.forEach(move -> names.add(move.getName()));
             for (String support : doubles ? DOUBLES_SUPPORT : SINGLES_SUPPORT) {
-                if (names.contains(support)) {
+                if (learnable.contains(support) && !chosen.contains(support)) {
                     chosen.add(support);
                     break;
                 }

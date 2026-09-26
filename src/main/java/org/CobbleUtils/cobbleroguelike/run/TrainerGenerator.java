@@ -1,6 +1,7 @@
 package org.CobbleUtils.cobbleroguelike.run;
 
 import org.CobbleUtils.cobbleroguelike.RogueConfig;
+import org.CobbleUtils.cobbleroguelike.compat.ArchetypeBuilder;
 import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
 import org.CobbleUtils.cobbleroguelike.compat.MegaData;
 import org.CobbleUtils.cobbleroguelike.shop.ShopCatalog;
@@ -87,8 +88,13 @@ public final class TrainerGenerator {
                         : buildTeam(null, size, level, false, false, random);
             }
         }
+        if (Modifiers.has(state, Modifiers.HARD)) {
+            state.battleSkill = 5; // Hard: the smartest AI for everyone
+        }
         state.battleDoubles = doubles && state.battleTeam.size() >= 2;
-        state.battleTeam = strengthen(state, state.battleDoubles, random);
+        if (!tryArchetype(state, kind, doubles, random)) {
+            state.battleTeam = strengthen(state, state.battleDoubles, random);
+        }
         applyGimmick(state, random);
         if (state.isCoop()) {
             splitForCoop(state, random);
@@ -146,8 +152,10 @@ public final class TrainerGenerator {
 
         if (lateBoss || state.badges >= config.bossMegaFromBadge) {
             Map<String, List<String>> stones = MegaData.stonesBySpecies();
-            // Prefer a team member that can already Mega Evolve; make it the ace.
-            for (int i = aceIndex; i >= 0 && !stones.isEmpty(); i--) {
+            // Prefer a team member that can already Mega Evolve; make it the ace. An archetype's
+            // setter (slot 0) stays in the lead.
+            int lowest = state.battleArchetype.isEmpty() ? 0 : 1;
+            for (int i = aceIndex; i >= lowest && !stones.isEmpty(); i--) {
                 String species = speciesOf(state.battleTeam.get(i));
                 if (stones.containsKey(species)) {
                     String member = state.battleTeam.remove(i);
@@ -221,6 +229,63 @@ public final class TrainerGenerator {
             types = CobblemonBridge.typeNames();
         }
         return types.get(random.nextInt(types.size()));
+    }
+
+    /**
+     * Replaces the prepared team with an archetype team (weather, Trick Room, Tailwind, terrain),
+     * built from a level-appropriate pool of the right type. Used by gyms from
+     * {@code archetypeFromBadge}, the Elite Four and the Champion, and on Hard by normal trainers with
+     * 3+ Pokémon. Returns false (keeping the plain team) if no archetype fits.
+     */
+    private static boolean tryArchetype(RunState state, NodeType kind, boolean doubles, Random random) {
+        RogueConfig config = RogueConfig.get();
+        if (!config.bossArchetypes) {
+            return false;
+        }
+        boolean hard = Modifiers.has(state, Modifiers.HARD);
+        boolean eligible = switch (kind) {
+            case GYM -> state.badges >= config.archetypeFromBadge || hard;
+            case ELITE, CHAMPION -> true;
+            case TRAINER -> hard && state.badges >= 2 && state.battleTeam.size() >= 3;
+            default -> false;
+        };
+        if (!eligible || state.battleTeam.isEmpty()) {
+            return false;
+        }
+        int size = state.battleTeam.size();
+        int level = levelOfTeam(state.battleTeam);
+        String type = state.battleType.isEmpty() ? null : state.battleType;
+        int tier = switch (kind) {
+            case GYM -> state.badges == 0 ? 0 : state.badges < 4 ? 1 : 2;
+            case ELITE, CHAMPION -> 2;
+            default -> 1;
+        };
+        if (hard) {
+            tier = Math.min(2, tier + 1);
+        }
+        List<String> pool = kind == NodeType.TRAINER
+                ? Encounters.trainerPool(state, level)
+                : CobblemonBridge.speciesPool(type, Scaling.minBst(level), Scaling.maxBst(level), false);
+        if (pool.size() < size * 2 && kind != NodeType.TRAINER) {
+            pool = CobblemonBridge.speciesPool(type, 0, Scaling.maxBst(level) + 100, false);
+        }
+        pool.sort(String::compareTo);
+        ArchetypeBuilder.Result result = ArchetypeBuilder.build(pool, size, level,
+                ArchetypeBuilder.preferredFor(type, random), doubles, tier, random);
+        if (result == null) {
+            return false;
+        }
+        state.battleTeam = new ArrayList<>(result.team());
+        state.battleArchetype = result.archetype();
+        return true;
+    }
+
+    private static int levelOfTeam(List<String> team) {
+        int level = 1;
+        for (String member : team) {
+            level = Math.max(level, levelOf(member));
+        }
+        return level;
     }
 
     /**

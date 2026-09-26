@@ -94,6 +94,32 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
   - Gym 5 and later, and the Champion: adds full EV spreads.
   - Normal trainers get the best level-up movesets, and their ace holds an item from 4 badges on.
 
+### Boss archetypes (hard, planned teams)
+
+Inspired by Radical Red, Run & Bun and the Kaizo hacks. Boss teams (gyms from `archetypeFromBadge`, the Elite Four, the Champion, and on Hard any trainer with 3+ Pokémon from 2 badges) are built by `ArchetypeBuilder` around one plan:
+
+| Archetype | Setter (ability, else move + item) | Abusers / bonuses |
+|---|---|---|
+| Rain | Drizzle / Rain Dance + Damp Rock | Swift Swim, Rain Dish, Dry Skin, Hydration; water ×1.5, Thunder and Hurricane boosted |
+| Sun | Drought / Sunny Day + Heat Rock | Chlorophyll, Solar Power, Protosynthesis…; fire ×1.5, Solar Beam allowed |
+| Sandstorm | Sand Stream / Sandstorm + Smooth Rock | Sand Rush, Sand Force; rock, ground and steel boosted |
+| Snow | Snow Warning / Snowscape + Icy Rock | Slush Rush, Ice Body; ice ×1.5, Blizzard and Aurora Veil |
+| Trick Room | Trick Room (slow, bulky, Mental Herb) | slow hard hitters, 0 Speed IVs, Brave/Quiet natures |
+| Tailwind | Tailwind (+ Focus Sash) | fast attackers |
+| Electric / Psychic / Grassy Terrain | Surge abilities / terrain move + Terrain Extender | Surge Surfer, Quark Drive, Expanding Force, Grassy Glide |
+
+- **Roles:** found by **ability and learnset** from the level-appropriate species pool (gym type, BST window), not from hard-coded species. So it works at every level and with addon Pokémon.
+  - Order: setter first (Protect in doubles), then a support (Fake Out, Follow Me or Rage Powder, Helping Hand, Intimidate; Protect; Sitrus Berry), then abusers sorted so the strongest is the ace, last.
+  - Abilities are forced via `ability=`. If a type can't fill an archetype, the next preferred one is tried, falling back to a plain competitive team.
+- **Types to archetypes:**
+  - Water: Rain, else Trick Room. Fire: Sun, else Tailwind.
+  - Rock, ground, steel: Sandstorm, else Trick Room. Ice: Snow.
+  - Electric: Electric Terrain, else Rain. Psychic: Psychic Terrain, else Trick Room.
+  - Ghost, fairy: Trick Room. Flying: Tailwind.
+  - The Elite Four and the Champion pick from all archetypes. There's a 30% chance of swapping the first two choices.
+- **All teams in doubles:** spread moves (`allAdjacent`, `allAdjacentFoes` targets) score ×1.25, and support moves include Icy Wind, Electroweb, Tailwind and Wide Guard for speed control.
+- **Hard modifier:** the smartest AI (skill 5) for every trainer, one set tier higher, and archetypes for strong normal trainers.
+
 ### Elite Four and boss gimmicks
 
 - **Elite Four:** after the last badge, a boss floor comes every `eliteEvery` (2) floors: `eliteCount` (4) Elite Four members, then the Champion.

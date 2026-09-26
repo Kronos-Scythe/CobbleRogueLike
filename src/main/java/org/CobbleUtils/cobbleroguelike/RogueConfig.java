@@ -341,6 +341,17 @@ public final class RogueConfig {
     public double eliteRewardMultiplier = 5.0;
     public boolean healAfterElite = false;
 
+    // ---------------------------------------------------------------- boss archetypes
+
+    /**
+     * Bosses build teams around a plan (Radical Red / Run & Bun style): rain, sun, sand, snow,
+     * Trick Room, Tailwind or a terrain, with a setter, abusers and (in doubles) Fake Out /
+     * redirection / Intimidate support.
+     */
+    public boolean bossArchetypes = true;
+    /** Gyms use archetypes from this many badges on (the Elite Four and the Champion always do). */
+    public int archetypeFromBadge = 1;
+
     // ---------------------------------------------------------------- boss gimmicks (Mega Showdown)
 
     /** Gym leaders, the Elite Four and the Champion Mega Evolve or Terastallize (needs Mega Showdown). */

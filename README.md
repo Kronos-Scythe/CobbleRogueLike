@@ -57,6 +57,10 @@ Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue sav
 - **Isolation:** only your party is swapped for the run, and it's written to disk first. Run Pokémon are tagged, and anything leaked is cleaned up. The PC, `/pc`, `/trade`, catching, outside battles and held-item swaps are blocked during a run.
 - **Biomes:** 12 biomes (Volcano, Tundra, Caves…), each built from **Cobblemon's real spawn data**, so regional forms and addon species appear. Shiny (1/256) and hidden-ability (10%) chances.
 - **Battles:** real Cobblemon NPC trainers with `StrongBattleAI`. Gyms, the Elite Four and the Champion are **double battles** with competitive sets: chosen moves, support moves such as Protect or Fake Out, held items, natures, IVs and EVs.
+- **Boss team archetypes** (Radical Red / Run & Bun style):
+  - Gym leaders from the 2nd gym, plus the Elite Four and the Champion, build teams around a plan: **Rain, Sun, Sandstorm, Snow, Trick Room, Tailwind** or **Electric / Psychic / Grassy Terrain**.
+  - Each team has a setter that leads, abusers (Swift Swim, Chlorophyll, slow hard hitters under Trick Room…) and, in doubles, a Fake Out / Follow Me / Intimidate support.
+  - Gyms pick a style that fits their type, and the battle preview shows it.
 - **Modifiers:** Nuzlocke, Solo, Hard, No Shop and All Doubles, each with a token bonus.
 - **Co-op runs** (inspired by Coop+):
   - Invite a friend from the start page or with `/rogue invite <player>`.
@@ -93,7 +97,7 @@ Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue sav
 
 - **Levels and pacing:** `starterLevel`, `resetStarterLevel`, `gymEvery`, `gymCount`, `levelCaps`, `gymTeamSizes`, `eliteCount`, `eliteEvery`
 - **Co-op:** `coopPartyLimit` (3), `coopMaxDistance`, `coopInviteSeconds`
-- **Battles:** `doubleBattles` (`bosses` / `all` / `none`), `doubleTrainerChance`, `bossGimmicks`
+- **Battles:** `bossArchetypes`, `archetypeFromBadge`, `doubleBattles` (`bosses` / `all` / `none`), `doubleTrainerChance`, `bossGimmicks`
 - **Encounters:** `biomes` (Minecraft/Cobblemon biome ids and `#tags`, plus theme types), spawn bucket weights, `shinyChance`, `hiddenAbilityChance`, and the legendary settings
 - **Economy:** `startingMoney`, trainer rewards, the `shop` catalog, `moveTutorPrice`
 - **Rewards:** `tokensPerFloor`, `tokensPerBadge`, `championTokenBonus`, the `tokenShop` catalog, modifier bonuses

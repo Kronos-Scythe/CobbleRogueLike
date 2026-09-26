@@ -277,6 +277,9 @@ public final class RogueMenus {
         if (state.battleDoubles) {
             lore.add(Text.literal("Double Battle!").formatted(Formatting.AQUA, Formatting.BOLD));
         }
+        if (!state.battleArchetype.isEmpty()) {
+            lore.add(Text.literal("Team style: " + state.battleArchetype).formatted(Formatting.GOLD));
+        }
         if (state.battleGimmick.equals("mega")) {
             lore.add(Text.literal("Their ace can Mega Evolve!").formatted(Formatting.LIGHT_PURPLE));
         } else if (state.battleGimmick.equals("tera")) {
