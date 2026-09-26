@@ -35,7 +35,8 @@ The Gradle daemon runs on Java 25 (see `gradle/gradle-daemon-jvm.properties`). T
    - **Legendary:** fight a legendary and it joins you if you win (after badges 2, 4 and 6, and rarely otherwise).
 3. **Every 5th floor is a gym.** It has a random type, a double battle, a competitive team and a badge. Your run level cap rises with each badge.
 4. **After 8 badges**, 4 Elite Four battles, then **the Champion**. Beat them to win.
-5. **Losing or forfeiting ends the run.** Either way you earn **Rogue Tokens** to spend in `/rogue shop`.
+5. **Losing or forfeiting ends the run.** Either way you earn **Rogue Tokens** to spend in the Rogue Shop.
+6. **Save & leave** any time between battles. Your real party comes back so you can play normally, and you can continue the run later from `/rogue`.
 
 Every run screen has a **nav bar** along the bottom row:
 
@@ -45,11 +46,11 @@ Every run screen has a **nav bar** along the bottom row:
 | Shop | Spend coins on healing items, competitive held items, berries, mints, evolution items… |
 | Bag | Use items, give or take held items, and move items between Pokémon |
 | Move Tutor | Level-up moves are free; TM, tutor and egg moves cost coins |
-| Rogue Shop | Spend Rogue Tokens on real items |
+| Save & leave | Put the run away and get your real party back; continue later from `/rogue` |
 | How to play | A quick guide |
 | End run | Ends the run (asks for confirmation first) |
 
-Outside a run, `/rogue` opens the hub with **Start a run**, **How to play** and the **Rogue Shop**.
+Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue saved run** / **End saved run**), **How to play** and the **Rogue Shop**. The Rogue Shop is only available here, not during a run.
 
 ### Features
 
@@ -66,7 +67,8 @@ Outside a run, `/rogue` opens the hub with **Start a run**, **How to play** and 
 | Command | Who | What |
 |---|---|---|
 | `/rogue` | everyone | Open the run menu (or the hub) |
-| `/rogue shop` | everyone | Spend Rogue Tokens on real items |
+| `/rogue shop` | outside a run | Spend Rogue Tokens on real items |
+| `/rogue save` | in a run | Save & leave the run |
 | `/rogue tutor` | in a run | Move Tutor |
 | `/rogue end` | in a run | End your run (tokens still paid) |
 | `/rogue endbattle` | in a run | Force-stop a stuck battle **and end the run** |
@@ -92,7 +94,7 @@ Unknown item ids are hidden from the shops, so catalog entries for missing mods 
 
 Stored per world in `<world>/cobbleroguelike/`:
 - `journals/`: saved real parties
-- `runs/`: run progress
+- `runs/`: run progress (and the run team while a run is saved)
 - `profiles/`: Rogue Tokens and stats
 
 ## More

@@ -40,6 +40,9 @@ public final class RunState {
     /** Elite Four members beaten, and the floor where the Elite Four stretch began (-1 = not yet). */
     /** Run modifiers (see {@link Modifiers}). */
     public Set<String> modifiers = new LinkedHashSet<>();
+    /** Saved & left: the run party is stored here and the player has their real party back. */
+    public boolean suspended = false;
+    public NbtList suspendedParty = new NbtList();
     public int eliteWins = 0;
     public int eliteStartFloor = -1;
     public List<String> usedEliteTypes = new ArrayList<>();
@@ -115,6 +118,8 @@ public final class RunState {
         tag.putInt("legendaryOfferedAt", legendaryOfferedAt);
         tag.putInt("eliteWins", eliteWins);
         tag.put("modifiers", writeStrings(new ArrayList<>(modifiers)));
+        tag.putBoolean("suspended", suspended);
+        tag.put("suspendedParty", suspendedParty.copy());
         tag.putInt("eliteStartFloor", eliteStartFloor);
         tag.put("usedEliteTypes", writeStrings(usedEliteTypes));
         tag.put("nodeChoices", writeStrings(nodeChoices.stream().map(Enum::name).toList()));
@@ -151,6 +156,8 @@ public final class RunState {
         state.legendaryOfferedAt = tag.contains("legendaryOfferedAt") ? tag.getInt("legendaryOfferedAt") : -1;
         state.eliteWins = tag.getInt("eliteWins");
         state.modifiers.addAll(readStrings(tag, "modifiers"));
+        state.suspended = tag.getBoolean("suspended");
+        state.suspendedParty = tag.getList("suspendedParty", NbtElement.COMPOUND_TYPE);
         state.eliteStartFloor = tag.contains("eliteStartFloor") ? tag.getInt("eliteStartFloor") : -1;
         state.usedEliteTypes = readStrings(tag, "usedEliteTypes");
         for (String node : readStrings(tag, "nodeChoices")) {

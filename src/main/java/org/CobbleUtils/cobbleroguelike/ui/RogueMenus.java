@@ -30,7 +30,31 @@ public final class RogueMenus {
 
     public static void hub(ServerPlayerEntity player, boolean confirmAbandon) {
         Menu menu = new Menu(Text.literal("CobbleRogue"));
-        if (!RunManager.isInRun(player)) {
+        RunState saved = RunManager.isInRun(player) ? null : RunManager.get().savedRun(player);
+        if (saved != null && confirmAbandon) {
+            menu.button(11, Menu.stack("minecraft:lime_concrete", Text.literal("Keep my saved run").formatted(Formatting.GREEN), List.of()),
+                    p -> hub(p, false));
+            menu.button(15, Menu.stack("minecraft:red_concrete", Text.literal("Yes, end my saved run").formatted(Formatting.RED), List.of(
+                    Text.literal("Its Pokémon will be lost."),
+                    Text.literal("You still get Rogue Tokens for its progress."))),
+                    p -> RunManager.get().abandonSaved(p));
+        } else if (saved != null) {
+            menu.button(11, Menu.stack("minecraft:compass", Text.literal("Continue saved run").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
+                    Text.literal("Floor " + saved.floor + " - " + Biomes.get(saved.biome).name),
+                    Text.literal(saved.badges + " badges, " + saved.money + " coins"),
+                    Text.literal(saved.suspendedParty.size() + " Pokémon waiting"),
+                    Text.literal(""),
+                    Text.literal("Your real party is stored while you play.").formatted(Formatting.YELLOW))),
+                    p -> RunManager.get().continueSaved(p));
+            menu.icon(13, guide());
+            menu.button(15, Menu.stack("minecraft:amethyst_shard", Text.literal("Rogue Shop").formatted(Formatting.LIGHT_PURPLE), List.of(
+                    Text.literal(RunManager.get().tokens(player) + " Rogue Tokens"),
+                    Text.literal("Spend tokens from past runs on real items."))),
+                    RewardMenus::shop);
+            menu.button(22, Menu.stack("minecraft:barrier", Text.literal("End saved run").formatted(Formatting.RED), List.of(
+                    Text.literal("Asks for confirmation."))),
+                    p -> hub(p, true));
+        } else if (!RunManager.isInRun(player)) {
             menu.button(11, Menu.stack("cobblemon:poke_ball", Text.literal("Start a run").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
                     Text.literal("Pick one of your own Pokémon as your"),
                     Text.literal("only partner and build a team as you go."),
@@ -341,8 +365,10 @@ public final class RogueMenus {
                 Text.literal("Use items, manage held items."))), p -> ShopMenus.bag(p, 0));
         menu.button(base + 4, Menu.stack("minecraft:enchanted_book", Text.literal("Move Tutor").formatted(Formatting.LIGHT_PURPLE), List.of(
                 Text.literal("Teach TM, tutor and egg moves."))), TutorMenus::pickPokemon);
-        menu.button(base + 5, Menu.stack("minecraft:amethyst_shard", Text.literal("Rogue Shop").formatted(Formatting.DARK_PURPLE), List.of(
-                Text.literal("Spend Rogue Tokens on real items."))), RewardMenus::shop);
+        menu.button(base + 5, Menu.stack("minecraft:ender_chest", Text.literal("Save & leave").formatted(Formatting.YELLOW), List.of(
+                Text.literal("Put the run away and get your real"),
+                Text.literal("party back. Continue any time from /rogue."))),
+                p -> RunManager.get().saveAndLeave(p));
         menu.icon(base + 6, guide());
         menu.button(base + 8, Menu.stack("minecraft:barrier", Text.literal("End run").formatted(Formatting.RED), List.of(
                 Text.literal("Asks for confirmation."))), p -> hub(p, true));
@@ -358,8 +384,10 @@ public final class RogueMenus {
                 Text.literal("Losing ends the run, but you always earn"),
                 Text.literal("Rogue Tokens for /rogue shop."),
                 Text.literal(""),
-                Text.literal("Commands: /rogue, /rogue shop, /rogue tutor,").formatted(Formatting.DARK_GRAY),
-                Text.literal("/rogue end, /rogue endbattle, /rogue clean").formatted(Formatting.DARK_GRAY)));
+                Text.literal("Save & leave any time and continue later."),
+                Text.literal(""),
+                Text.literal("Commands: /rogue, /rogue save, /rogue tutor,").formatted(Formatting.DARK_GRAY),
+                Text.literal("/rogue shop, /rogue end, /rogue endbattle, /rogue clean").formatted(Formatting.DARK_GRAY)));
     }
 
     /** Model icon for a property string like {@code "zubat level=7"}, falling back to a Poké Ball. */

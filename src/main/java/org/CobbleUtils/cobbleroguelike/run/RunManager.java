@@ -95,6 +95,11 @@ public final class RunManager {
                 Cobbleroguelike.LOGGER.warn("Found an interrupted rogue swap for {}, restoring their party", player.getName().getString());
                 restore(player);
                 message(player, "Your last rogue run was interrupted. Your party has been restored.", Formatting.YELLOW);
+            } else if (journal && isSuspended(readRunOrNull(player))) {
+                // A save & leave (or a continue) was interrupted: finish putting the run away.
+                Cobbleroguelike.LOGGER.warn("Finishing an interrupted save & leave for {}", player.getName().getString());
+                putAway(player);
+                message(player, "Your saved rogue run is safe. Use /rogue to continue it.", Formatting.AQUA);
             } else if (journal) {
                 RunState state = readRunOrNull(player);
                 List<Pokemon> party = CobblemonBridge.partyMembers(player);
@@ -110,8 +115,12 @@ public final class RunManager {
                     message(player, "You have a rogue run in progress. Use /rogue to continue.", Formatting.AQUA);
                 }
             } else if (run) {
-                Cobbleroguelike.LOGGER.warn("Found a rogue run for {} without a journal, discarding it", player.getName().getString());
-                storage.deleteRun(id);
+                if (isSuspended(readRunOrNull(player))) {
+                    message(player, "You have a saved rogue run. Use /rogue to continue it.", Formatting.AQUA);
+                } else {
+                    Cobbleroguelike.LOGGER.warn("Found a rogue run for {} without a journal, discarding it", player.getName().getString());
+                    storage.deleteRun(id);
+                }
             }
         } catch (IOException | RuntimeException e) {
             Cobbleroguelike.LOGGER.error("Failed to recover rogue run for {}", player.getName().getString(), e);
@@ -162,6 +171,11 @@ public final class RunManager {
             message(player, "Finish your battle before cleaning up.", Formatting.RED);
             return false;
         }
+        if (!active.containsKey(id) && !storage.hasJournal(id) && isSuspended(readRunOrNull(player))) {
+            purgeStrayRogueMons(player);
+            message(player, "Your saved run is safe, and there's nothing else to clean up.", Formatting.GREEN);
+            return true;
+        }
         if (!active.containsKey(id) && !storage.hasJournal(id) && !storage.hasRun(id)) {
             int removed = purgeStrayRogueMons(player);
             message(player, removed > 0
@@ -192,6 +206,10 @@ public final class RunManager {
     public void start(ServerPlayerEntity player) {
         if (active.containsKey(player.getUuid())) {
             openCurrent(player);
+            return;
+        }
+        if (savedRun(player) != null) {
+            RogueMenus.hub(player, false);
             return;
         }
         // Leftover data from a run that couldn't be resumed: clean it up first.
@@ -225,6 +243,11 @@ public final class RunManager {
         }
         if (CobblemonBridge.isInBattle(player)) {
             message(player, "You can't start a run while in a battle.", Formatting.RED);
+            return;
+        }
+        if (savedRun(player) != null) {
+            // Never overwrite a saved run.
+            RogueMenus.hub(player, false);
             return;
         }
         if (storage.hasJournal(id)) {
@@ -378,6 +401,28 @@ public final class RunManager {
     private void restore(ServerPlayerEntity player) throws IOException {
         UUID id = player.getUuid();
         active.remove(id);
+        restoreParty(player);
+        storage.deleteRun(id);
+        storage.deleteJournal(id);
+    }
+
+    /**
+     * Swaps the journaled real party back in (see {@link #restore}) but keeps the run file. Used by
+     * Save & leave, after the run party has been written into the run file.
+     */
+    private void putAway(ServerPlayerEntity player) throws IOException {
+        active.remove(player.getUuid());
+        restoreParty(player);
+        storage.deleteJournal(player.getUuid());
+    }
+
+    private static boolean isSuspended(RunState state) {
+        return state != null && state.suspended;
+    }
+
+    /** Party half of {@link #restore}: rogue Pokémon out, journal Pokémon in (deduplicated by UUID). */
+    private void restoreParty(ServerPlayerEntity player) throws IOException {
+        UUID id = player.getUuid();
         DynamicRegistryManager registries = player.getRegistryManager();
 
         List<Pokemon> journalMons = new ArrayList<>();
@@ -409,9 +454,141 @@ public final class RunManager {
                 CobblemonBridge.party(player).add(pokemon);
             }
         }
+    }
 
-        storage.deleteRun(id);
-        storage.deleteJournal(id);
+    // ---------------------------------------------------------------- save & leave / continue
+
+    /** The player's saved (suspended) run, or null. */
+    public RunState savedRun(ServerPlayerEntity player) {
+        if (active.containsKey(player.getUuid()) || !storage.hasRun(player.getUuid())) {
+            return null;
+        }
+        RunState state = readRunOrNull(player);
+        return isSuspended(state) ? state : null;
+    }
+
+    /**
+     * Save & leave. The run party is written into the run file first, then the rogue Pokémon are
+     * removed and the real party is restored. If this is interrupted, login finishes it (see onJoin).
+     */
+    public void saveAndLeave(ServerPlayerEntity player) {
+        RunState state = active.get(player.getUuid());
+        if (state == null) {
+            message(player, "You don't have an active run.", Formatting.RED);
+            return;
+        }
+        if (CobblemonBridge.isInBattle(player)) {
+            message(player, "Finish your battle before saving.", Formatting.RED);
+            return;
+        }
+        DynamicRegistryManager registries = player.getRegistryManager();
+        NbtList saved = new NbtList();
+        for (Pokemon pokemon : CobblemonBridge.partyMembers(player)) {
+            if (CobblemonBridge.isRogue(pokemon)) {
+                saved.add(CobblemonBridge.save(pokemon, registries));
+            }
+        }
+        state.suspended = true;
+        state.suspendedParty = saved;
+        try {
+            storage.writeRun(state);
+        } catch (IOException e) {
+            state.suspended = false;
+            state.suspendedParty = new NbtList();
+            Cobbleroguelike.LOGGER.error("Failed to save rogue run for {}", player.getName().getString(), e);
+            message(player, "Couldn't save your run; it's still active.", Formatting.RED);
+            return;
+        }
+        try {
+            putAway(player);
+            player.closeHandledScreen();
+            message(player, "Run saved on floor " + state.floor + ". Your party is back. Use /rogue to continue any time.", Formatting.GREEN);
+        } catch (IOException | RuntimeException e) {
+            Cobbleroguelike.LOGGER.error("Failed to put away rogue run for {}", player.getName().getString(), e);
+            message(player, "Your run is saved, but restoring your party failed. Rejoin to finish; nothing was lost.", Formatting.RED);
+        }
+    }
+
+    /** Continues a saved run: the real party is journaled first, then the run party comes back. */
+    public void continueSaved(ServerPlayerEntity player) {
+        UUID id = player.getUuid();
+        if (active.containsKey(id)) {
+            openCurrent(player);
+            return;
+        }
+        if (CobblemonBridge.isInBattle(player)) {
+            message(player, "Finish your battle first.", Formatting.RED);
+            return;
+        }
+        RunState state = savedRun(player);
+        if (state == null) {
+            message(player, "You don't have a saved run.", Formatting.RED);
+            return;
+        }
+        if (storage.hasJournal(id)) {
+            message(player, "Your run data needs a moment; rejoin and try again.", Formatting.RED);
+            return;
+        }
+        DynamicRegistryManager registries = player.getRegistryManager();
+        List<Pokemon> realParty = CobblemonBridge.partyMembers(player);
+        NbtList journalParty = new NbtList();
+        for (Pokemon pokemon : realParty) {
+            journalParty.add(CobblemonBridge.save(pokemon, registries));
+        }
+        NbtCompound journal = new NbtCompound();
+        journal.putInt("version", 1);
+        journal.put("party", journalParty);
+        try {
+            storage.writeJournal(id, journal);
+        } catch (IOException e) {
+            Cobbleroguelike.LOGGER.error("Failed to write rogue journal for {}", player.getName().getString(), e);
+            message(player, "Couldn't continue (failed to save your party).", Formatting.RED);
+            return;
+        }
+        try {
+            for (Pokemon pokemon : realParty) {
+                CobblemonBridge.recall(pokemon);
+                CobblemonBridge.party(player).remove(pokemon);
+            }
+            for (int i = 0; i < state.suspendedParty.size(); i++) {
+                CobblemonBridge.party(player).add(CobblemonBridge.load(state.suspendedParty.getCompound(i), registries));
+            }
+            state.suspended = false;
+            state.suspendedParty = new NbtList();
+            repair(state);
+            storage.writeRun(state);
+            active.put(id, state);
+        } catch (IOException | RuntimeException e) {
+            Cobbleroguelike.LOGGER.error("Failed to continue rogue run for {}, rolling back", player.getName().getString(), e);
+            try {
+                putAway(player);
+            } catch (IOException | RuntimeException rollback) {
+                Cobbleroguelike.LOGGER.error("Rollback failed for {}; data kept on disk", player.getName().getString(), rollback);
+            }
+            message(player, "Couldn't continue your run. Your party is unchanged.", Formatting.RED);
+            return;
+        }
+        message(player, "Welcome back! Your run continues on floor " + state.floor + ".", Formatting.GREEN);
+        openCurrent(player);
+    }
+
+    /** Ends a saved run without continuing it; tokens are paid for its progress. */
+    public void abandonSaved(ServerPlayerEntity player) {
+        RunState state = savedRun(player);
+        if (state == null) {
+            message(player, "You don't have a saved run.", Formatting.RED);
+            return;
+        }
+        try {
+            storage.deleteRun(player.getUuid());
+        } catch (IOException e) {
+            Cobbleroguelike.LOGGER.error("Failed to delete saved run for {}", player.getName().getString(), e);
+            message(player, "Couldn't end the saved run; try again.", Formatting.RED);
+            return;
+        }
+        message(player, "You ended your saved run.", Formatting.GOLD);
+        payOut(player, state, false);
+        RogueMenus.hub(player, false);
     }
 
     /** Deletes rogue Pokémon found anywhere they should not be. Returns how many were removed. */

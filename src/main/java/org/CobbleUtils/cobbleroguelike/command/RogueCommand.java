@@ -17,7 +17,7 @@ import static net.minecraft.server.command.CommandManager.literal;
 
 /**
  * {@code /rogue} opens the menu. {@code /rogue shop} spends Rogue Tokens on real items.
- * {@code /rogue tutor} opens the run's Move Tutor. {@code /rogue end} ends the run. {@code /rogue endbattle} force-stops
+ * {@code /rogue tutor} opens the run's Move Tutor. {@code /rogue save} saves & leaves the run (continue from {@code /rogue}). {@code /rogue end} ends the run. {@code /rogue endbattle} force-stops
  * the current battle and ends the run. {@code /rogue clean} force-cleans leftover run data and gives
  * back the saved party.
  * Admin: {@code /rogue admin end|endbattle|clean <player>}, {@code /rogue admin tokens <player> <amount>},
@@ -44,7 +44,16 @@ public final class RogueCommand {
                     return 1;
                 }))
                 .then(literal("shop").executes(ctx -> {
-                    RewardMenus.shop(ctx.getSource().getPlayerOrThrow());
+                    ServerPlayerEntity player = ctx.getSource().getPlayerOrThrow();
+                    if (RunManager.isInRun(player)) {
+                        ctx.getSource().sendError(Text.literal("The Rogue Shop is on the /rogue start page. Save & leave your run first."));
+                        return 0;
+                    }
+                    RewardMenus.shop(player);
+                    return 1;
+                }))
+                .then(literal("save").executes(ctx -> {
+                    RunManager.get().saveAndLeave(ctx.getSource().getPlayerOrThrow());
                     return 1;
                 }))
                 .then(literal("tutor").executes(ctx -> {

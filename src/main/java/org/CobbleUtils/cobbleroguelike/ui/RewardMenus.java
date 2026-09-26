@@ -22,6 +22,10 @@ public final class RewardMenus {
     }
 
     public static void shop(ServerPlayerEntity player) {
+        if (RunManager.isInRun(player)) {
+            RunManager.message(player, "The Rogue Shop is on the /rogue start page. Save & leave your run first.", Formatting.RED);
+            return;
+        }
         int tokens = RunManager.get().tokens(player);
         Menu menu = new Menu(Text.literal("Rogue Shop - " + tokens + " tokens"), 6);
         List<RewardService.Category> catalog = RewardService.catalog();

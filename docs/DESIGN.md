@@ -186,6 +186,13 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
    - A run file that can't be read, or whose party is empty, is also restored. Values from older builds fall back to safe defaults when loading.
 6. **`/rogue clean`** (or `/rogue admin clean <player>`) force-runs the same restore at any time outside a battle. It also runs automatically when **Start a run** finds leftover data.
 
+### Save & leave
+
+- **Save & leave** (nav bar or `/rogue save`) writes the rogue party into the run file (`suspended`, `suspendedParty`) **first**. Then it runs the party half of the restore (rogue Pokémon out, journal in) and deletes the journal. The player plays normally, with no run active and no guards.
+- **Continue** (hub) journals the current real party first, swaps it out, loads the saved run party back and clears `suspended`.
+- **Recovery:** a journal alongside a suspended run file means a save or a continue was interrupted. Login finishes putting the run away. That's always safe because the run party is already in the run file. A suspended run file with no journal is a normal saved run.
+- Only one run per player: a saved run blocks starting a new one. **End saved run** pays tokens and deletes it. `/rogue clean` leaves saved runs alone.
+
 ### Guards while a run is active
 
 - **Battles:** Cobblemon battles the mod didn't start are cancelled. This stops free EXP and catching.
