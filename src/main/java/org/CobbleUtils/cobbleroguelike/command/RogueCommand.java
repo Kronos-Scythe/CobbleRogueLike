@@ -12,8 +12,9 @@ import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
 
 /**
- * {@code /rogue} opens the menu. {@code /rogue end} ends the run.
- * Admin: {@code /rogue admin end <player>}, {@code /rogue admin reload}.
+ * {@code /rogue} opens the menu. {@code /rogue end} ends the run. {@code /rogue clean} force-cleans
+ * leftover run data and gives back the saved party.
+ * Admin: {@code /rogue admin end <player>}, {@code /rogue admin clean <player>}, {@code /rogue admin reload}.
  */
 public final class RogueCommand {
 
@@ -35,6 +36,10 @@ public final class RogueCommand {
                     RunManager.get().end(player, "You ended your run.");
                     return 1;
                 }))
+                .then(literal("clean").executes(ctx -> {
+                    RunManager.get().clean(ctx.getSource().getPlayerOrThrow());
+                    return 1;
+                }))
                 .then(literal("admin")
                         .requires(source -> source.hasPermissionLevel(2))
                         .then(literal("end").then(argument("player", EntityArgumentType.player()).executes(ctx -> {
@@ -42,6 +47,13 @@ public final class RogueCommand {
                             RunManager.get().end(target, "An admin ended your run.");
                             ctx.getSource().sendFeedback(() -> Text.literal("Ended rogue run for " + target.getName().getString()), true);
                             return 1;
+                        })))
+                        .then(literal("clean").then(argument("player", EntityArgumentType.player()).executes(ctx -> {
+                            ServerPlayerEntity target = EntityArgumentType.getPlayer(ctx, "player");
+                            boolean cleaned = RunManager.get().clean(target);
+                            ctx.getSource().sendFeedback(() -> Text.literal((cleaned ? "Cleaned" : "Could not clean")
+                                    + " rogue run data for " + target.getName().getString()), true);
+                            return cleaned ? 1 : 0;
                         })))
                         .then(literal("reload").executes(ctx -> {
                             RogueConfig.load();

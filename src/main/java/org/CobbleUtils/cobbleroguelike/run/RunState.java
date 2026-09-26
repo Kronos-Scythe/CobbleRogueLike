@@ -70,21 +70,33 @@ public final class RunState {
 
     public static RunState fromNbt(NbtCompound tag) {
         RunState state = new RunState(tag.getUuid("player"), tag.getLong("seed"));
-        state.phase = Phase.valueOf(tag.getString("phase"));
+        // Tolerate data from older builds: unknown values fall back instead of failing the load.
+        state.phase = parse(Phase.class, tag.getString("phase"), Phase.CHOOSE_NODE);
         state.floor = tag.getInt("floor");
         state.badges = tag.getInt("badges");
         state.usedGymTypes = readStrings(tag, "usedGymTypes");
-        state.nodeChoices = new ArrayList<>(readStrings(tag, "nodeChoices").stream().map(NodeType::valueOf).toList());
+        for (String node : readStrings(tag, "nodeChoices")) {
+            NodeType type = parse(NodeType.class, node, null);
+            if (type != null) {
+                state.nodeChoices.add(type);
+            }
+        }
         state.encounterOptions = readStrings(tag, "encounterOptions");
         state.pendingEncounter = tag.getString("pendingEncounter");
-        if (tag.contains("battleKind")) {
-            state.battleKind = NodeType.valueOf(tag.getString("battleKind"));
-        }
+        state.battleKind = parse(NodeType.class, tag.getString("battleKind"), NodeType.TRAINER);
         state.battleName = tag.getString("battleName");
         state.battleType = tag.getString("battleType");
         state.battleTeam = readStrings(tag, "battleTeam");
         state.battleSkill = tag.getInt("battleSkill");
         return state;
+    }
+
+    private static <E extends Enum<E>> E parse(Class<E> type, String name, E fallback) {
+        try {
+            return Enum.valueOf(type, name);
+        } catch (IllegalArgumentException e) {
+            return fallback;
+        }
     }
 
     private static NbtList writeStrings(List<String> values) {

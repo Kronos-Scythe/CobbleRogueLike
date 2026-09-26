@@ -99,6 +99,8 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
    - A journal with no run file means the swap was interrupted, so the party is restored.
    - A run file whose party contains an untagged Pokémon is corrupt, so the party is restored.
    - A run file with no journal is discarded.
+   - A run file that can't be read, or whose party is empty, is also restored. Values from older builds fall back to safe defaults when loading.
+6. **`/rogue clean`** (or `/rogue admin clean <player>`) force-runs the same restore at any time outside a battle. It also runs automatically when **Start a run** finds leftover data.
 
 ### Guards while a run is active
 

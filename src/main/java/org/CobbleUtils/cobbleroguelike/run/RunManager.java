@@ -90,13 +90,16 @@ public final class RunManager {
                 restore(player);
                 message(player, "Your last rogue run was interrupted. Your party has been restored.", Formatting.YELLOW);
             } else if (journal) {
-                RunState state = storage.readRun(id);
-                boolean untagged = CobblemonBridge.partyMembers(player).stream().anyMatch(p -> !CobblemonBridge.isRogue(p));
-                if (untagged) {
-                    Cobbleroguelike.LOGGER.warn("Rogue run for {} had untagged Pokémon in its party, ending it", player.getName().getString());
+                RunState state = readRunOrNull(player);
+                List<Pokemon> party = CobblemonBridge.partyMembers(player);
+                boolean untagged = party.stream().anyMatch(p -> !CobblemonBridge.isRogue(p));
+                if (state == null || untagged || party.isEmpty()) {
+                    Cobbleroguelike.LOGGER.warn("Rogue run for {} could not be resumed (unreadable: {}, untagged party: {}), ending it",
+                            player.getName().getString(), state == null, untagged);
                     restore(player);
                     message(player, "Your rogue run could not be resumed and has ended. Your party has been restored.", Formatting.YELLOW);
                 } else {
+                    repair(state);
                     active.put(id, state);
                     message(player, "You have a rogue run in progress. Use /rogue to continue.", Formatting.AQUA);
                 }
@@ -111,6 +114,61 @@ public final class RunManager {
         purgeStrayRogueMons(player);
     }
 
+    /** Fixes up states loaded from older builds so the menus always have something to show. */
+    private void repair(RunState state) {
+        if (state.phase == Phase.BATTLE && state.battleTeam.isEmpty()) {
+            state.phase = Phase.CHOOSE_NODE;
+        }
+        if (state.phase == Phase.ENCOUNTER && state.encounterOptions.isEmpty()) {
+            state.phase = Phase.CHOOSE_NODE;
+        }
+        if (state.phase == Phase.RELEASE && state.pendingEncounter.isEmpty()) {
+            state.phase = Phase.CHOOSE_NODE;
+        }
+        if (state.phase == Phase.CHOOSE_NODE && state.nodeChoices.isEmpty()) {
+            advanceFloor(state);
+        }
+    }
+
+    private RunState readRunOrNull(ServerPlayerEntity player) {
+        try {
+            return storage.readRun(player.getUuid());
+        } catch (IOException | RuntimeException e) {
+            Cobbleroguelike.LOGGER.error("Failed to read rogue run for {}", player.getName().getString(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Force-cleans a player's run data: ends any run, deletes rogue Pokémon and gives back the
+     * journaled party. Safe to call at any time (restore is idempotent). Returns false only if
+     * cleanup couldn't happen (e.g. the player is mid-battle or the restore failed).
+     */
+    public boolean clean(ServerPlayerEntity player) {
+        UUID id = player.getUuid();
+        if (CobblemonBridge.isInBattle(player)) {
+            message(player, "Finish your battle before cleaning up.", Formatting.RED);
+            return false;
+        }
+        if (!active.containsKey(id) && !storage.hasJournal(id) && !storage.hasRun(id)) {
+            int removed = purgeStrayRogueMons(player);
+            message(player, removed > 0
+                    ? "Removed " + removed + " leftover run Pokémon. Nothing else to clean up."
+                    : "Nothing to clean up.", Formatting.GREEN);
+            return true;
+        }
+        try {
+            restore(player);
+            purgeStrayRogueMons(player);
+            message(player, "Old run data cleaned up. Your party has been restored.", Formatting.GREEN);
+            return true;
+        } catch (IOException | RuntimeException e) {
+            Cobbleroguelike.LOGGER.error("Failed to clean rogue run data for {}", player.getName().getString(), e);
+            message(player, "Cleanup failed. Your saved party is still on disk; ask an admin to check the log.", Formatting.RED);
+            return false;
+        }
+    }
+
     public void onDisconnect(ServerPlayerEntity player) {
         // The run and journal are already on disk, so the player can resume later.
         active.remove(player.getUuid());
@@ -122,6 +180,10 @@ public final class RunManager {
     public void start(ServerPlayerEntity player) {
         if (active.containsKey(player.getUuid())) {
             openCurrent(player);
+            return;
+        }
+        // Leftover data from a run that couldn't be resumed: clean it up first.
+        if (storage.hasJournal(player.getUuid()) && !clean(player)) {
             return;
         }
         RogueMenus.partnerPicker(player, 0);
@@ -142,7 +204,10 @@ public final class RunManager {
             return;
         }
         if (storage.hasJournal(id)) {
-            message(player, "Your previous run hasn't been cleaned up yet. Rejoin or ask an admin.", Formatting.RED);
+            // The picker was opened before a stale run was found; clean it up and pick again.
+            if (clean(player)) {
+                RogueMenus.partnerPicker(player, 0);
+            }
             return;
         }
         Pokemon original = CobblemonBridge.findOwned(player, partnerId);
