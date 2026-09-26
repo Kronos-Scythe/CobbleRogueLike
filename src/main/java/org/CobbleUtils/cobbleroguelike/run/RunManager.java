@@ -18,7 +18,7 @@ import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
 import org.CobbleUtils.cobbleroguelike.run.RunState.NodeType;
 import org.CobbleUtils.cobbleroguelike.run.RunState.Phase;
 import org.CobbleUtils.cobbleroguelike.shop.ShopCatalog;
-import org.CobbleUtils.cobbleroguelike.ui.MenuScreenHandler;
+import org.CobbleUtils.cobbleroguelike.ui.Menu;
 import org.CobbleUtils.cobbleroguelike.ui.RogueMenus;
 import org.CobbleUtils.cobbleroguelike.util.Scheduler;
 
@@ -553,7 +553,7 @@ public final class RunManager {
         }
         try {
             putAway(player);
-            player.closeHandledScreen();
+            Menu.close(player);
             message(player, "Run saved on floor " + state.floor + ". Your party is back. Use /rogue to continue any time.", Formatting.GREEN);
         } catch (IOException | RuntimeException e) {
             Cobbleroguelike.LOGGER.error("Failed to put away rogue run for {}", player.getName().getString(), e);
@@ -811,7 +811,7 @@ public final class RunManager {
             beginCoopRun(lobby);
             return;
         }
-        player.closeHandledScreen();
+        Menu.close(player);
         ServerPlayerEntity other = online(lobby.other(player.getUuid()));
         message(player, "Partner chosen! Waiting for " + (other == null ? "your partner" : other.getName().getString()) + "...", Formatting.GREEN);
         if (other != null) {
@@ -913,7 +913,7 @@ public final class RunManager {
         }
         for (UUID id : state.members()) {
             ServerPlayerEntity member = online(id);
-            if (member != null && !id.equals(except) && member.currentScreenHandler instanceof MenuScreenHandler) {
+            if (member != null && !id.equals(except) && Menu.isOpen(member)) {
                 openCurrent(member);
             }
         }
@@ -1109,8 +1109,8 @@ public final class RunManager {
             tell(state, "The battle couldn't start. Make sure both of you have a Pokémon able to fight.", Formatting.RED);
             return;
         }
-        host.closeHandledScreen();
-        guest.closeHandledScreen();
+        Menu.close(host);
+        Menu.close(guest);
         UUID hostId = state.playerId;
         CobblemonBattles.onEnd(battle, ended -> {
             Boolean won = CobblemonBattles.playerWon(ended, hostId);
@@ -1351,7 +1351,7 @@ public final class RunManager {
             message(player, "The battle couldn't start. Is your lead Pokémon able to fight?", Formatting.RED);
             return;
         }
-        player.closeHandledScreen();
+        Menu.close(player);
         UUID playerId = player.getUuid();
         // End handlers can run mid-teardown; handle the result on the next tick instead.
         CobblemonBattles.onEnd(battle, ended -> {

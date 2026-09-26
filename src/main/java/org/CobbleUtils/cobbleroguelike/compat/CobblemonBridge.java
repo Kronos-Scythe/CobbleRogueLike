@@ -289,6 +289,23 @@ public final class CobblemonBridge {
         party(player).heal();
     }
 
+    public static int level(Pokemon pokemon) {
+        return pokemon.getLevel();
+    }
+
+    /** Current HP as a fraction of max HP (0 when fainted). */
+    public static float healthFraction(Pokemon pokemon) {
+        return pokemon.getMaxHealth() <= 0 ? 0F : Math.max(0F, Math.min(1F, pokemon.getCurrentHealth() / (float) pokemon.getMaxHealth()));
+    }
+
+    public static String healthText(Pokemon pokemon) {
+        return pokemon.getCurrentHealth() + "/" + pokemon.getMaxHealth();
+    }
+
+    public static ItemStack heldItem(Pokemon pokemon) {
+        return pokemon.heldItem();
+    }
+
     public static String describe(Pokemon pokemon) {
         return pokemon.getSpecies().getName() + " Lv." + pokemon.getLevel();
     }

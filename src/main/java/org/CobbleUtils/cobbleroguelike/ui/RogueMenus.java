@@ -408,6 +408,8 @@ public final class RogueMenus {
 
     public static void encounter(ServerPlayerEntity player, RunState state) {
         Menu menu = new Menu(Text.literal("Wild Pokémon appeared!"), RUN_ROWS);
+        String block = Biomes.block(state.biome);
+        menu.filler(block).theme(block, true);
         UUID id = player.getUuid();
         Integer myPick = state.coopPicks.get(id);
         UUID otherId = state.other(id);
@@ -493,6 +495,7 @@ public final class RogueMenus {
         RogueConfig config = RogueConfig.get();
         int base = NAV_ROW * 9;
         menu.fillRow(NAV_ROW, "minecraft:black_stained_glass_pane");
+        menu.navRow(NAV_ROW).chestOnly(base); // the run screen shows the floor info itself
 
         List<Text> info = new ArrayList<>();
         info.add(Text.literal("Biome: " + Biomes.get(state.biome).name).formatted(Formatting.AQUA));
@@ -553,7 +556,7 @@ public final class RogueMenus {
             menu.button(slot++, Menu.stack(head, Text.literal(other.getName().getString()).formatted(busy ? Formatting.GRAY : Formatting.AQUA), List.of(
                     busy ? Text.literal("Already in a run").formatted(Formatting.RED) : Text.literal("Click to invite").formatted(Formatting.YELLOW))),
                     p -> {
-                        p.closeHandledScreen();
+                        Menu.close(p);
                         RunManager.get().invite(p, other);
                     });
         }

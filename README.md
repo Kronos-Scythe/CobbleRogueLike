@@ -44,7 +44,9 @@ The Gradle daemon runs on Java 25 (see `gradle/gradle-daemon-jvm.properties`). T
 5. **Losing or forfeiting ends the run.** Either way you earn **Rogue Tokens** to spend in the Rogue Shop.
 6. **Save & leave** any time between battles. Your real party comes back so you can play normally, and you can continue the run later from `/rogue`.
 
-Every run screen has a **nav bar** along the bottom row:
+With the mod installed on your client you get a **run screen** like Battle Tower's: your team (and your partner's in co-op) on the left, floor, badges, coins and a floor tower up to the next gym in the middle, and the options on the right, themed with the biome's blocks. Without it (server-only install) the same menus open as chests.
+
+Every run screen has a **nav bar** along the bottom:
 
 | Button | What it does |
 |---|---|
@@ -120,6 +122,7 @@ Run modifiers (Nuzlocke, Hard…) stay optional. To make the game easier, lower 
 - **Encounters:** `biomes` (Minecraft/Cobblemon biome ids and `#tags`, plus theme types), spawn bucket weights, `shinyChance`, `hiddenAbilityChance`, and the legendary settings
 - **Economy:** `startingMoney`, trainer rewards, the `shop` catalog, `moveTutorPrice`
 - **Rewards:** `tokensPerFloor`, `tokensPerBadge`, `championTokenBonus`, the `tokenShop` catalog, modifier bonuses
+- **UI:** `clientScreen` (use the run screen for players who have the mod), each biome's `block`
 - **Blocked commands** during runs: `blockedCommands`
 
 Unknown item ids are hidden from the shops, so catalog entries for missing mods are safe.

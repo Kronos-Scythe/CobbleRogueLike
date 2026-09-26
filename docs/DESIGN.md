@@ -35,7 +35,7 @@ A roguelike adventure mode for Cobblemon. It is modelled mostly on **Pokémon Em
 
 ## 3. The run loop (menu-driven, Battle Tower-style)
 
-The whole run is played through server-side chest menus (`/rogue`). There's no dimension, map or arenas, and the player stays wherever they are.
+The whole run is played through menus (`/rogue`): a Battle Tower-style run screen for players with the mod installed, or server-side chest menus for everyone else. There's no dimension, map or arenas, and the player stays wherever they are.
 
 ```
 /rogue ──► Start ──► pick your partner from your party/PC
@@ -296,7 +296,10 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
 ## 7. Technical notes
 
 - **Target:** Cobblemon 1.6.x on MC 1.21.1, Fabric (yarn mappings). All Cobblemon API calls live in `compat/CobblemonBridge` and `compat/CobblemonGuards`, so an API change only needs fixing there.
-- **Menus:** vanilla `GenericContainerScreenHandler` subclasses (`ui/Menu`, `ui/MenuScreenHandler`). No client code is needed, and clicks never move items.
+- **Menus:** every screen is a `ui/Menu` (slots, icons, click actions), shown one of two ways:
+  - **Run screen** (client has the mod, `clientScreen: true`): `RogueViews` turns the menu plus the run into a `RogueView` (party with HP and held items, the partner's team in co-op, stats, a floor tower of the current segment with the gym on top, or the Elite Four and Champion), sent with `RogueNetwork.OpenView`. The client `RogueScreen` lists the menu's slots as rows (name, first lore line, full lore on hover) and the nav row (`Menu.navRow`) as bottom buttons. Clicks come back as `RogueNetwork.Click(viewId, slot, button)`; stale views are ignored. `Menu.close` / `Menu.isOpen` cover both kinds of screen.
+  - **Chest** (vanilla `GenericContainerScreenHandler` subclasses, `ui/MenuScreenHandler`): for clients without the mod. Clicks never move items.
+  - **Biome theme:** each biome has a `block` (sand, snow, magma...). The run screen tiles it behind the stats and, on encounters, behind the wild Pokémon; chest encounters use it as filler.
 - **Battles (next):** build trainer actors programmatically and start them through the battle registry. Mark them as sanctioned so the battle guard lets them through.
 - **Data-driven:** encounter pools live in `config/cobbleroguelike.json` for now, and move to datapack JSON with trainers, gyms and shops.
 

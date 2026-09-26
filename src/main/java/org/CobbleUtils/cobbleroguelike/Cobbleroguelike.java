@@ -11,6 +11,8 @@ import org.CobbleUtils.cobbleroguelike.compat.SpawnData;
 import org.CobbleUtils.cobbleroguelike.guard.RogueGuards;
 import org.CobbleUtils.cobbleroguelike.run.RunManager;
 import org.CobbleUtils.cobbleroguelike.util.Scheduler;
+import org.CobbleUtils.cobbleroguelike.ui.Menu;
+import org.CobbleUtils.cobbleroguelike.ui.RogueNetwork;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,7 +28,11 @@ public class Cobbleroguelike implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTED.register(RunManager::onServerStarted);
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> RunManager.onServerStopped());
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> RunManager.get().onJoin(handler.getPlayer()));
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> RunManager.get().onDisconnect(handler.getPlayer()));
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            RunManager.get().onDisconnect(handler.getPlayer());
+            Menu.forget(handler.getPlayer().getUuid());
+        });
+        RogueNetwork.register();
 
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> RogueCommand.register(dispatcher));
 

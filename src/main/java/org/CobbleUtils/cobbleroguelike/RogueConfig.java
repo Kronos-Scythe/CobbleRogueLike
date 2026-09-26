@@ -71,18 +71,18 @@ public final class RogueConfig {
      * and is the fallback when the spawn data has nothing to offer.
      */
     public List<RogueBiome> biomes = new ArrayList<>(List.of(
-            new RogueBiome("grasslands", "Grasslands", "minecraft:grass_block", List.of("#cobblemon:is_grassland", "#cobblemon:is_plains", "#cobblemon:is_floral"), List.of("normal", "grass", "bug", "flying")),
-            new RogueBiome("forest", "Forest", "minecraft:oak_sapling", List.of("#cobblemon:is_forest", "#cobblemon:is_taiga"), List.of("grass", "bug", "poison", "normal")),
-            new RogueBiome("jungle", "Jungle", "minecraft:jungle_sapling", List.of("#cobblemon:is_jungle", "#cobblemon:is_bamboo", "#cobblemon:is_tropical_island"), List.of("grass", "bug", "poison", "fighting")),
-            new RogueBiome("desert", "Desert", "minecraft:sand", List.of("#cobblemon:is_desert", "#cobblemon:is_arid", "#cobblemon:is_badlands"), List.of("ground", "rock", "fire")),
-            new RogueBiome("savanna", "Savanna", "minecraft:acacia_sapling", List.of("#cobblemon:is_savanna", "#cobblemon:is_shrubland"), List.of("normal", "ground", "fire", "electric")),
-            new RogueBiome("mountains", "Mountains", "minecraft:stone", List.of("#cobblemon:is_mountain", "#cobblemon:is_peak", "#cobblemon:is_highlands", "#cobblemon:is_hills"), List.of("rock", "fighting", "steel", "flying")),
-            new RogueBiome("coast", "Ocean & Coast", "minecraft:tropical_fish_bucket", List.of("#cobblemon:is_ocean", "#cobblemon:is_beach", "#cobblemon:is_coast", "#cobblemon:is_river", "#cobblemon:is_freshwater"), List.of("water", "flying")),
-            new RogueBiome("swamp", "Swamp", "minecraft:lily_pad", List.of("#cobblemon:is_swamp"), List.of("poison", "water", "ground", "bug")),
-            new RogueBiome("tundra", "Tundra", "minecraft:snow_block", List.of("#cobblemon:is_snowy", "#cobblemon:is_freezing", "#cobblemon:is_tundra", "#cobblemon:is_glacial"), List.of("ice", "water", "steel")),
-            new RogueBiome("caves", "Caves", "minecraft:pointed_dripstone", List.of("#cobblemon:is_cave", "#cobblemon:is_dripstone", "#cobblemon:is_lush", "#cobblemon:is_deep_dark"), List.of("rock", "ground", "dark", "ghost", "steel")),
-            new RogueBiome("volcano", "Volcano", "minecraft:magma_block", List.of("#cobblemon:is_volcanic", "#cobblemon:is_thermal", "#minecraft:is_nether"), List.of("fire", "rock", "ground", "dark")),
-            new RogueBiome("mystic", "Mystic Grove", "minecraft:amethyst_shard", List.of("#cobblemon:is_magical", "#cobblemon:is_mushroom", "#cobblemon:is_cherry_blossom", "#cobblemon:is_spooky"), List.of("psychic", "fairy", "ghost", "dragon"))));
+            new RogueBiome("grasslands", "Grasslands", "minecraft:grass_block", "minecraft:moss_block", List.of("#cobblemon:is_grassland", "#cobblemon:is_plains", "#cobblemon:is_floral"), List.of("normal", "grass", "bug", "flying")),
+            new RogueBiome("forest", "Forest", "minecraft:oak_sapling", "minecraft:oak_log", List.of("#cobblemon:is_forest", "#cobblemon:is_taiga"), List.of("grass", "bug", "poison", "normal")),
+            new RogueBiome("jungle", "Jungle", "minecraft:jungle_sapling", "minecraft:jungle_log", List.of("#cobblemon:is_jungle", "#cobblemon:is_bamboo", "#cobblemon:is_tropical_island"), List.of("grass", "bug", "poison", "fighting")),
+            new RogueBiome("desert", "Desert", "minecraft:sand", "minecraft:sand", List.of("#cobblemon:is_desert", "#cobblemon:is_arid", "#cobblemon:is_badlands"), List.of("ground", "rock", "fire")),
+            new RogueBiome("savanna", "Savanna", "minecraft:acacia_sapling", "minecraft:acacia_log", List.of("#cobblemon:is_savanna", "#cobblemon:is_shrubland"), List.of("normal", "ground", "fire", "electric")),
+            new RogueBiome("mountains", "Mountains", "minecraft:stone", "minecraft:stone", List.of("#cobblemon:is_mountain", "#cobblemon:is_peak", "#cobblemon:is_highlands", "#cobblemon:is_hills"), List.of("rock", "fighting", "steel", "flying")),
+            new RogueBiome("coast", "Ocean & Coast", "minecraft:tropical_fish_bucket", "minecraft:prismarine", List.of("#cobblemon:is_ocean", "#cobblemon:is_beach", "#cobblemon:is_coast", "#cobblemon:is_river", "#cobblemon:is_freshwater"), List.of("water", "flying")),
+            new RogueBiome("swamp", "Swamp", "minecraft:lily_pad", "minecraft:mud", List.of("#cobblemon:is_swamp"), List.of("poison", "water", "ground", "bug")),
+            new RogueBiome("tundra", "Tundra", "minecraft:snow_block", "minecraft:snow_block", List.of("#cobblemon:is_snowy", "#cobblemon:is_freezing", "#cobblemon:is_tundra", "#cobblemon:is_glacial"), List.of("ice", "water", "steel")),
+            new RogueBiome("caves", "Caves", "minecraft:pointed_dripstone", "minecraft:deepslate", List.of("#cobblemon:is_cave", "#cobblemon:is_dripstone", "#cobblemon:is_lush", "#cobblemon:is_deep_dark"), List.of("rock", "ground", "dark", "ghost", "steel")),
+            new RogueBiome("volcano", "Volcano", "minecraft:magma_block", "minecraft:magma_block", List.of("#cobblemon:is_volcanic", "#cobblemon:is_thermal", "#minecraft:is_nether"), List.of("fire", "rock", "ground", "dark")),
+            new RogueBiome("mystic", "Mystic Grove", "minecraft:amethyst_shard", "minecraft:amethyst_block", List.of("#cobblemon:is_magical", "#cobblemon:is_mushroom", "#cobblemon:is_cherry_blossom", "#cobblemon:is_spooky"), List.of("psychic", "fairy", "ghost", "dragon"))));
 
     /** Relative weights of Cobblemon spawn buckets for route encounters. */
     public int commonWeight = 60;
@@ -113,11 +113,18 @@ public final class RogueConfig {
         public String icon;
         public List<String> biomes;
         public List<String> types;
+        /** Block shown behind this biome's screens and encounters (a default is used if unset). */
+        public String block;
 
         public RogueBiome(String id, String name, String icon, List<String> biomes, List<String> types) {
+            this(id, name, icon, null, biomes, types);
+        }
+
+        public RogueBiome(String id, String name, String icon, String block, List<String> biomes, List<String> types) {
             this.id = id;
             this.name = name;
             this.icon = icon;
+            this.block = block;
             this.biomes = new ArrayList<>(biomes);
             this.types = new ArrayList<>(types);
         }
@@ -494,6 +501,12 @@ public final class RogueConfig {
                     new ShopEntry("cobblemon:beast_ball", 30),
                     new ShopEntry("cobblemon:cherish_ball", 50),
                     new ShopEntry("cobblemon:master_ball", 750)))));
+
+    /**
+     * Players who have the mod installed get the run screen (party, floor tower, biome-themed
+     * panels) instead of chest menus. Players without it always get chest menus.
+     */
+    public boolean clientScreen = true;
 
     /** Root commands a non-op player cannot run during a run. */
     public List<String> blockedCommands = new ArrayList<>(List.of("pc", "trade"));
