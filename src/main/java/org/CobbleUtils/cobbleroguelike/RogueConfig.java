@@ -362,6 +362,13 @@ public final class RogueConfig {
     public int tokensPerBadge = 15;
     public int championTokenBonus = 100;
 
+    /** Extra Rogue Tokens for each run modifier (0.5 = +50%). */
+    public double nuzlockeTokenBonus = 0.5;
+    public double soloTokenBonus = 1.0;
+    public double hardTokenBonus = 0.5;
+    public double noShopTokenBonus = 0.25;
+    public double allDoublesTokenBonus = 0.25;
+
     /** The /rogue shop reward catalog: real items, bought with Rogue Tokens and kept forever. */
     public List<ShopCategory> tokenShop = new ArrayList<>(List.of(
             new ShopCategory("Nature Mints", "cobblemon:adamant_mint", "give", List.of(

@@ -106,6 +106,18 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
   - Cobblemon only filters gimmicks for players, so for NPCs Showdown offers them automatically. `GimmickAI` wraps `StrongBattleAI`, which never picks gimmicks itself, and selects Mega or Tera when the ace is active.
   - The NPC holds a Mega Bracelet or Tera Orb as a visual tell, and the battle preview warns about the gimmick.
 
+### Run modifiers
+
+Chosen on a setup screen before the partner picker. Each adds a Rogue Token bonus (configurable):
+
+| Modifier | Effect | Tokens |
+|---|---|---|
+| Nuzlocke | Rogue Pokémon that faint in a won battle are released | +50% |
+| Solo | Route cards become trainers; legendaries pay 2× coins instead of joining | +100% |
+| Hard | Enemies +2 levels, one set tier higher, more held items | +50% |
+| No Shop | The run shop is closed (the bag still works) | +25% |
+| All Doubles | Every trainer battle is a double battle | +25% |
+
 ### Move Tutor
 
 - Open it from any run screen (or `/rogue tutor`). Level-up moves the Pokémon already qualifies for are **free**. TM, tutor, egg and legacy moves cost `moveTutorPrice` coins (800).
@@ -227,5 +239,5 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
 2. **Done (untested build):** trainer nodes, gyms every 5 floors, the Champion, run level cap, losing ends the run.
 3. **Done (untested build):** run coins, an always-open shop, the run bag with held-item management, and optional Mega Showdown gimmicks. Next: using bag items during battles, and gimmicks for gym leaders.
 4. **Meta:** Rogue Tokens and `/rogue shop` are done. The quest board is still to come.
-5. **Modifiers:** Nuzlocke, Solo, Doubles, Rainbow, Gauntlet.
+5. **Done (untested build):** modifiers Nuzlocke, Solo, Hard, No Shop and All Doubles. Rainbow and Gauntlet are still to come.
 6. **Co-op:** invites, multi battles.

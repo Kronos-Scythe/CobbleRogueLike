@@ -7,6 +7,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
 import org.CobbleUtils.cobbleroguelike.compat.ItemBridge;
+import org.CobbleUtils.cobbleroguelike.run.Modifiers;
 import org.CobbleUtils.cobbleroguelike.run.RunManager;
 import org.CobbleUtils.cobbleroguelike.run.RunState;
 import org.CobbleUtils.cobbleroguelike.shop.ShopCatalog;
@@ -29,6 +30,10 @@ public final class ShopMenus {
     public static void shop(ServerPlayerEntity player) {
         RunState state = runState(player);
         if (state == null) {
+            return;
+        }
+        if (Modifiers.has(state, Modifiers.NO_SHOP)) {
+            RunManager.message(player, "The shop is closed on No Shop runs.", Formatting.RED);
             return;
         }
         Menu menu = new Menu(Text.literal("Shop - " + state.money + " coins"), 6);

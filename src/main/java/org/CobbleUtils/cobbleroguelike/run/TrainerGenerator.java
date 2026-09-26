@@ -34,11 +34,12 @@ public final class TrainerGenerator {
         state.battleKind = kind;
         String name = NAMES[random.nextInt(NAMES.length)];
         boolean boss = kind == NodeType.GYM || kind == NodeType.ELITE || kind == NodeType.CHAMPION;
-        boolean doubles = switch (config.doubleBattles.toLowerCase(Locale.ROOT)) {
+        boolean doubles = Modifiers.has(state, Modifiers.ALL_DOUBLES) || switch (config.doubleBattles.toLowerCase(Locale.ROOT)) {
             case "all" -> true;
             case "none" -> false;
             default -> boss || random.nextDouble() < config.doubleTrainerChance;
         };
+        int hardBonus = Modifiers.has(state, Modifiers.HARD) ? 2 : 0;
         switch (kind) {
             case GYM -> {
                 String type = pickGymType(state, random);
@@ -46,11 +47,11 @@ public final class TrainerGenerator {
                 state.battleType = type;
                 state.battleName = "Gym Leader " + name + " (" + capitalize(type) + ")";
                 state.battleSkill = Math.min(5, 2 + state.badges / 2);
-                state.battleTeam = buildTeam(type, teamSize(config.gymTeamSizes, state.badges), cap, true, false, random);
+                state.battleTeam = buildTeam(type, teamSize(config.gymTeamSizes, state.badges), cap + hardBonus, true, false, random);
             }
             case ELITE -> {
                 String type = pickEliteType(state, random);
-                int level = Scaling.eliteLevel(state);
+                int level = Scaling.eliteLevel(state) + hardBonus;
                 state.battleType = type;
                 state.battleName = "Elite Four " + name + " (" + capitalize(type) + ")";
                 state.battleSkill = 5;
@@ -60,7 +61,7 @@ public final class TrainerGenerator {
                 int cap = Scaling.levelCap(state.badges);
                 state.battleName = "Champion " + name;
                 state.battleSkill = 5;
-                state.battleTeam = buildTeam(null, teamSize(config.gymTeamSizes, state.badges), cap, true, false, random);
+                state.battleTeam = buildTeam(null, teamSize(config.gymTeamSizes, state.badges), cap + hardBonus, true, false, random);
             }
             case LEGENDARY -> {
                 if (!prepareLegendary(state, random)) {
@@ -70,7 +71,7 @@ public final class TrainerGenerator {
                 return; // legendary encounters are always singles and use their natural set
             }
             default -> {
-                int level = Scaling.trainerLevel(state);
+                int level = Scaling.trainerLevel(state) + hardBonus;
                 int size = Math.min(6, 1 + state.badges / 2 + random.nextInt(2));
                 if (doubles) {
                     size = Math.max(2, size);
@@ -211,7 +212,12 @@ public final class TrainerGenerator {
                 itemsForAll = false;
             }
         }
-        boolean aceItem = state.battleKind != NodeType.TRAINER || state.badges >= 4;
+        boolean hard = Modifiers.has(state, Modifiers.HARD);
+        if (hard) {
+            tier = Math.min(2, tier + 1);
+            itemsForAll = itemsForAll || state.badges >= 4;
+        }
+        boolean aceItem = state.battleKind != NodeType.TRAINER || state.badges >= 4 || hard;
         Set<String> usedItems = new HashSet<>();
         List<String> result = new ArrayList<>();
         for (int i = 0; i < state.battleTeam.size(); i++) {

@@ -9,6 +9,7 @@ import org.CobbleUtils.cobbleroguelike.RogueConfig;
 import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
 import org.CobbleUtils.cobbleroguelike.run.RunManager;
 import org.CobbleUtils.cobbleroguelike.run.Biomes;
+import org.CobbleUtils.cobbleroguelike.run.Modifiers;
 import org.CobbleUtils.cobbleroguelike.run.RunState;
 import org.CobbleUtils.cobbleroguelike.run.Scaling;
 import org.CobbleUtils.cobbleroguelike.run.TrainerGenerator;
@@ -56,6 +57,34 @@ public final class RogueMenus {
             menu.button(15, Menu.stack("minecraft:barrier", Text.literal("End run").formatted(Formatting.RED), List.of()),
                     p -> hub(p, true));
         }
+        menu.open(player);
+    }
+
+    /** Run setup: toggle modifiers, then go on to pick a partner. */
+    public static void setup(ServerPlayerEntity player) {
+        Set<String> chosen = RunManager.get().pendingModifiers(player);
+        Menu menu = new Menu(Text.literal("New run - modifiers"));
+        int[] slots = {10, 11, 12, 13, 14};
+        for (int i = 0; i < Modifiers.ALL.size() && i < slots.length; i++) {
+            Modifiers.Info info = Modifiers.ALL.get(i);
+            boolean on = chosen.contains(info.id());
+            List<Text> lore = new ArrayList<>();
+            lore.add(Text.literal(info.description()));
+            lore.add(Text.literal("+" + Math.round(Modifiers.bonus(info.id()) * 100) + "% Rogue Tokens").formatted(Formatting.LIGHT_PURPLE));
+            lore.add(on ? Text.literal("ON - click to turn off").formatted(Formatting.GREEN)
+                    : Text.literal("OFF - click to turn on").formatted(Formatting.GRAY));
+            ItemStack icon = on ? Menu.stack(info.icon(), Text.literal(""), List.of())
+                    : Menu.stack("minecraft:gray_dye", Text.literal(""), List.of());
+            menu.button(slots[i], Menu.stack(icon, Text.literal(info.name()).formatted(on ? Formatting.GOLD : Formatting.WHITE), lore),
+                    p -> RunManager.get().toggleModifier(p, info.id()));
+        }
+        menu.icon(4, Menu.stack("minecraft:book", Text.literal("Run modifiers").formatted(Formatting.WHITE), List.of(
+                Text.literal("Optional rules for extra Rogue Tokens."),
+                Text.literal("Current bonus: +" + Math.round(Modifiers.totalBonus(chosen) * 100) + "%").formatted(Formatting.LIGHT_PURPLE))));
+        menu.button(16, Menu.stack("cobblemon:poke_ball", Text.literal("Choose your partner").formatted(Formatting.GREEN, Formatting.BOLD), List.of(
+                Text.literal("Continue to the partner picker."))),
+                p -> partnerPicker(p, 0));
+        menu.button(22, Menu.stack("minecraft:oak_door", Text.literal("Back"), List.of()), p -> hub(p, false));
         menu.open(player);
     }
 
@@ -280,7 +309,10 @@ public final class RogueMenus {
                         ? "  Elite Four: " + state.eliteWins + "/" + RogueConfig.get().eliteCount : "")),
                 Text.literal("Biome: " + Biomes.get(state.biome).name).formatted(Formatting.AQUA),
                 Text.literal("Level cap: " + Scaling.levelCap(state.badges)),
-                Text.literal("Coins: " + state.money).formatted(Formatting.GOLD))));
+                Text.literal("Coins: " + state.money).formatted(Formatting.GOLD),
+                Text.literal(state.modifiers.isEmpty() ? "No modifiers" : "Modifiers: " + String.join(", ", state.modifiers.stream()
+                        .map(id -> Modifiers.ALL.stream().filter(m -> m.id().equals(id)).map(Modifiers.Info::name).findFirst().orElse(id))
+                        .toList())).formatted(Formatting.DARK_PURPLE))));
         menu.button(19, Menu.stack("minecraft:emerald", Text.literal("Shop").formatted(Formatting.GREEN), List.of(
                 Text.literal(state.money + " coins"),
                 Text.literal("Healing, battle items, training..."))), ShopMenus::shop);

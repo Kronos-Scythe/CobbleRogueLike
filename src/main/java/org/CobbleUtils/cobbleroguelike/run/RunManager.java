@@ -52,6 +52,8 @@ public final class RunManager {
     private final Map<UUID, RunState> active = new HashMap<>();
     /** Players whose battle is being force-stopped by /rogue endbattle; their run ends right after. */
     private final Set<UUID> endingByCommand = new HashSet<>();
+    /** Modifiers picked on the setup screen, applied when the run begins. */
+    private final Map<UUID, Set<String>> pendingModifiers = new HashMap<>();
 
     private RunManager(MinecraftServer server) {
         this.server = server;
@@ -196,7 +198,19 @@ public final class RunManager {
         if (storage.hasJournal(player.getUuid()) && !clean(player)) {
             return;
         }
-        RogueMenus.partnerPicker(player, 0);
+        RogueMenus.setup(player);
+    }
+
+    public Set<String> pendingModifiers(ServerPlayerEntity player) {
+        return pendingModifiers.computeIfAbsent(player.getUuid(), id -> new java.util.LinkedHashSet<>());
+    }
+
+    public void toggleModifier(ServerPlayerEntity player, String id) {
+        Set<String> modifiers = pendingModifiers(player);
+        if (!modifiers.remove(id)) {
+            modifiers.add(id);
+        }
+        RogueMenus.setup(player);
     }
 
     /**
@@ -258,6 +272,8 @@ public final class RunManager {
             CobblemonBridge.party(player).add(partner);
             RunState state = new RunState(id, new Random().nextLong());
             state.money = RogueConfig.get().startingMoney;
+            state.modifiers.addAll(pendingModifiers.getOrDefault(id, Set.of()));
+            pendingModifiers.remove(id);
             state.biome = Biomes.roll(state, new Random(state.seed ^ 0x5EEDB10EL));
             advanceFloor(state);
             storage.writeRun(state);
@@ -305,8 +321,9 @@ public final class RunManager {
     private void payOut(ServerPlayerEntity player, RunState state, boolean won) {
         RogueConfig config = RogueConfig.get();
         int floorsCleared = Math.max(0, state.floor - 1);
-        int tokens = floorsCleared * config.tokensPerFloor + state.badges * config.tokensPerBadge
+        int base = floorsCleared * config.tokensPerFloor + state.badges * config.tokensPerBadge
                 + (won ? config.championTokenBonus : 0);
+        int tokens = (int) Math.round(base * (1.0 + Modifiers.totalBonus(state.modifiers)));
         NbtCompound profile = storage.readProfile(player.getUuid());
         profile.putInt("tokens", profile.getInt("tokens") + tokens);
         profile.putInt("runs", profile.getInt("runs") + 1);
@@ -524,6 +541,9 @@ public final class RunManager {
         }
         int reward = battleReward(state);
         state.money += reward;
+        if (Modifiers.has(state, Modifiers.NUZLOCKE)) {
+            releaseFainted(player);
+        }
         switch (state.battleKind) {
             case CHAMPION -> {
                 finish(player, "You defeated " + state.battleName + "! Your run is complete!", true);
@@ -557,6 +577,18 @@ public final class RunManager {
                 }
             }
             case LEGENDARY -> {
+                if (Modifiers.has(state, Modifiers.SOLO)) {
+                    int bonus = reward * 2;
+                    state.money += bonus;
+                    message(player, "Solo run: " + state.battleName.replaceFirst("^Wild ", "") + " leaves you "
+                            + bonus + " bonus coins instead of joining.", Formatting.LIGHT_PURPLE);
+                    message(player, "+" + reward + " coins (" + state.money + " total).", Formatting.GOLD);
+                    state.clearBattle();
+                    advanceFloor(state);
+                    save(player, state);
+                    openCurrent(player);
+                    return;
+                }
                 String recruit = state.battleTeam.get(0);
                 message(player, state.battleName.replaceFirst("^Wild ", "") + " was impressed by your strength and joins your team!", Formatting.LIGHT_PURPLE);
                 message(player, "+" + reward + " coins (" + state.money + " total).", Formatting.GOLD);
@@ -602,6 +634,17 @@ public final class RunManager {
         });
         if (!hadBattle) {
             message(player, "You're not in a battle; ending your run.", Formatting.YELLOW);
+        }
+    }
+
+    /** Nuzlocke: rogue Pokémon that fainted are gone for good. */
+    private void releaseFainted(ServerPlayerEntity player) {
+        for (Pokemon pokemon : CobblemonBridge.partyMembers(player)) {
+            if (pokemon.getCurrentHealth() <= 0 && CobblemonBridge.isRogue(pokemon)) {
+                CobblemonBridge.recall(pokemon);
+                CobblemonBridge.party(player).remove(pokemon);
+                message(player, pokemon.getSpecies().getName() + " fainted and is gone for good.", Formatting.DARK_RED);
+            }
         }
     }
 
@@ -790,6 +833,9 @@ public final class RunManager {
         }
         if (nodes.stream().allMatch(node -> node == NodeType.REST)) {
             nodes.set(random.nextInt(nodes.size()), NodeType.ROUTE);
+        }
+        if (Modifiers.has(state, Modifiers.SOLO)) {
+            nodes.replaceAll(node -> node == NodeType.ROUTE ? NodeType.TRAINER : node);
         }
         // Legendary card: guaranteed on the first floor after certain badges, rare otherwise.
         boolean guaranteed = Scaling.floorInSegment(state.floor) == 1 && state.badges > state.legendaryOfferedAt

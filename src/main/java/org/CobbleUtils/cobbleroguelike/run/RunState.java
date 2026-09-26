@@ -38,6 +38,8 @@ public final class RunState {
     /** Badge count whose guaranteed Legendary card was already offered (-1 = none yet). */
     public int legendaryOfferedAt = -1;
     /** Elite Four members beaten, and the floor where the Elite Four stretch began (-1 = not yet). */
+    /** Run modifiers (see {@link Modifiers}). */
+    public Set<String> modifiers = new LinkedHashSet<>();
     public int eliteWins = 0;
     public int eliteStartFloor = -1;
     public List<String> usedEliteTypes = new ArrayList<>();
@@ -112,6 +114,7 @@ public final class RunState {
         tag.put("usedBiomes", writeStrings(usedBiomes));
         tag.putInt("legendaryOfferedAt", legendaryOfferedAt);
         tag.putInt("eliteWins", eliteWins);
+        tag.put("modifiers", writeStrings(new ArrayList<>(modifiers)));
         tag.putInt("eliteStartFloor", eliteStartFloor);
         tag.put("usedEliteTypes", writeStrings(usedEliteTypes));
         tag.put("nodeChoices", writeStrings(nodeChoices.stream().map(Enum::name).toList()));
@@ -147,6 +150,7 @@ public final class RunState {
         state.usedBiomes = readStrings(tag, "usedBiomes");
         state.legendaryOfferedAt = tag.contains("legendaryOfferedAt") ? tag.getInt("legendaryOfferedAt") : -1;
         state.eliteWins = tag.getInt("eliteWins");
+        state.modifiers.addAll(readStrings(tag, "modifiers"));
         state.eliteStartFloor = tag.contains("eliteStartFloor") ? tag.getInt("eliteStartFloor") : -1;
         state.usedEliteTypes = readStrings(tag, "usedEliteTypes");
         for (String node : readStrings(tag, "nodeChoices")) {

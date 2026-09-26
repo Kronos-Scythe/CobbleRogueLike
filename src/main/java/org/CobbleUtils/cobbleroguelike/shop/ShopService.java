@@ -6,6 +6,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Formatting;
 import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
 import org.CobbleUtils.cobbleroguelike.compat.ItemBridge;
+import org.CobbleUtils.cobbleroguelike.run.Modifiers;
 import org.CobbleUtils.cobbleroguelike.run.RunManager;
 import org.CobbleUtils.cobbleroguelike.run.RunState;
 import org.CobbleUtils.cobbleroguelike.ui.ShopMenus;
@@ -21,6 +22,10 @@ public final class ShopService {
     public static void buy(ServerPlayerEntity player, int categoryIndex, int entryIndex, int quantity, int page) {
         RunState state = requireRun(player);
         if (state == null) {
+            return;
+        }
+        if (Modifiers.has(state, Modifiers.NO_SHOP)) {
+            RunManager.message(player, "The shop is closed on No Shop runs.", Formatting.RED);
             return;
         }
         List<ShopCatalog.Category> categories = ShopCatalog.categories();
