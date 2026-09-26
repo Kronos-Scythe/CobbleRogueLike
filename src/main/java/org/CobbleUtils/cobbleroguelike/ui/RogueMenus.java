@@ -283,45 +283,46 @@ public final class RogueMenus {
             int index = i;
             RunState.NodeType node = state.nodeChoices.get(i);
             switch (node) {
-                case ROUTE -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:grass_block",
-                        Text.literal("Route").formatted(Formatting.GREEN), List.of(
-                                Text.literal("Pick one of several wild Pokémon"),
-                                Text.literal("from the " + Biomes.get(state.biome).name + " to join your team."))),
-                        p -> RunManager.get().chooseNode(p, index));
+                case ROUTE -> {
+                    // Each route card has its own biome, shown by its block.
+                    String biome = i < state.nodeBiomes.size() && !state.nodeBiomes.get(i).isEmpty()
+                            ? state.nodeBiomes.get(i) : state.biome;
+                    menu.button(CHOICE_SLOTS[i], Menu.stack(Biomes.block(biome),
+                            Text.literal(Biomes.get(biome).name).formatted(Formatting.GREEN), List.of(
+                                    Text.literal("Route"),
+                                    Text.literal("Catch 1 of 3 wild Pokémon."))),
+                            p -> RunManager.get().chooseNode(p, index));
+                }
                 case REST -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:campfire",
                         Text.literal("Rest stop").formatted(Formatting.GOLD), List.of(
                                 Text.literal("Fully heal your team."))),
                         p -> RunManager.get().chooseNode(p, index));
                 case TRAINER -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:iron_sword",
-                        Text.literal("Trainer battle").formatted(Formatting.RED), List.of(
-                                Text.literal("Fight a trainer around Lv. " + Scaling.trainerLevel(state) + "."),
-                                Text.literal("Your team gains EXP up to the level cap."))),
+                        Text.literal("Trainer").formatted(Formatting.RED), List.of(
+                                Text.literal("Around Lv. " + Scaling.trainerLevel(state) + "."),
+                                Text.literal("Win coins and EXP."))),
                         p -> RunManager.get().chooseNode(p, index));
                 case GYM -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:gold_block",
                         Text.literal("Gym battle").formatted(Formatting.GOLD, Formatting.BOLD), List.of(
-                                Text.literal("Badge " + (state.badges + 1) + " of " + RogueConfig.get().gymCount + "."),
-                                Text.literal("Leader's ace is Lv. " + Scaling.levelCap(state.badges) + "."),
-                                Text.literal(bossDoubles() ? "Double battle, competitive sets." : "Competitive sets.").formatted(Formatting.YELLOW),
-                                Text.literal("Losing ends the run!").formatted(Formatting.RED))),
+                                Text.literal("Badge " + (state.badges + 1) + " of " + RogueConfig.get().gymCount),
+                                Text.literal("Ace Lv. " + Scaling.levelCap(state.badges)),
+                                Text.literal(bossDoubles() ? "Double battle" : "Single battle").formatted(Formatting.YELLOW))),
                         p -> RunManager.get().chooseNode(p, index));
                 case ELITE -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:amethyst_block",
                         Text.literal("Elite Four").formatted(Formatting.DARK_PURPLE, Formatting.BOLD), List.of(
-                                Text.literal("Member " + (state.eliteWins + 1) + " of " + RogueConfig.get().eliteCount + "."),
-                                Text.literal("Around Lv. " + Scaling.eliteLevel(state) + ", full competitive team."),
-                                Text.literal(bossDoubles() ? "Double battle." : "Single battle.").formatted(Formatting.YELLOW),
-                                Text.literal("Losing ends the run!").formatted(Formatting.RED))),
+                                Text.literal("Member " + (state.eliteWins + 1) + " of " + RogueConfig.get().eliteCount),
+                                Text.literal("Around Lv. " + Scaling.eliteLevel(state)),
+                                Text.literal(bossDoubles() ? "Double battle" : "Single battle").formatted(Formatting.YELLOW))),
                         p -> RunManager.get().chooseNode(p, index));
                 case CHAMPION -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:dragon_head",
                         Text.literal("The Champion").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), List.of(
-                                Text.literal("The final battle, Lv. " + Scaling.levelCap(state.badges) + "."),
-                                Text.literal(bossDoubles() ? "Double battle, full competitive team." : "Full competitive team.").formatted(Formatting.YELLOW),
-                                Text.literal("Win to complete your run!"))),
+                                Text.literal("The final battle, Lv. " + Scaling.levelCap(state.badges)),
+                                Text.literal(bossDoubles() ? "Double battle" : "Single battle").formatted(Formatting.YELLOW))),
                         p -> RunManager.get().chooseNode(p, index));
                 case LEGENDARY -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:nether_star",
-                        Text.literal("Legendary encounter").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), List.of(
-                                Text.literal("A legendary Pokémon has appeared!"),
-                                Text.literal("Defeat it and it joins your team."),
-                                Text.literal("You can still walk away after seeing it."))),
+                        Text.literal("Legendary").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), List.of(
+                                Text.literal("Beat it and it joins you."),
+                                Text.literal("You can walk away after seeing it."))),
                         p -> RunManager.get().chooseNode(p, index));
             }
         }

@@ -24,7 +24,7 @@ public final class Modifiers {
             new Info(HARD, "Hard", "cobblemon:life_orb", "Every trainer is 2 levels higher (on top of the config difficulty)."),
             new Info(NO_SHOP, "No Shop", "cobblemon:relic_coin_pouch", "The run shop is closed."),
             new Info(ALL_DOUBLES, "All Doubles", "pokemon:doduo", "Every trainer battle is a double battle."),
-            new Info(DRAFT, "Counter Draft", "cobblemon:great_ball", "Before each boss, draft 1 of 3 Pokémon at the level cap that counter its type."));
+            new Info(DRAFT, "Counter Draft", "cobblemon:great_ball", "Before each boss, draft 1 of 3 Pokémon at the level cap that counter its type. Fewer tokens."));
 
     private Modifiers() {
     }
@@ -42,7 +42,7 @@ public final class Modifiers {
             case HARD -> config.hardTokenBonus;
             case NO_SHOP -> config.noShopTokenBonus;
             case ALL_DOUBLES -> config.allDoublesTokenBonus;
-            case DRAFT -> config.draftTokenBonus;
+            case DRAFT -> config.counterDraftTokenBonus;
             default -> 0.0;
         };
     }

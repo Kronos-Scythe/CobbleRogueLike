@@ -29,7 +29,7 @@ The Gradle daemon runs on Java 25 (see `gradle/gradle-daemon-jvm.properties`). T
 
 1. **`/rogue` → Start a run.** Toggle optional **modifiers**, then pick a partner from your party or PC. A copy joins the run at level 5, and your real party is saved safely until the run ends.
 2. **Each floor, choose 1 of 3 path cards:**
-   - **Route:** pick one of 3 wild Pokémon from the current biome.
+   - **Route:** each route card is its own biome (Desert, Tundra, Volcano…, shown by its block). Pick one of 3 wild Pokémon from it.
    - **Trainer:** fight an AI trainer (NPC) and earn coins.
    - **Rest stop:** full heal.
    - **Legendary:** fight a legendary and it joins you if you win (after badges 3 and 6, rarely otherwise; co-op after badges 4 and 7).
@@ -44,7 +44,7 @@ The Gradle daemon runs on Java 25 (see `gradle/gradle-daemon-jvm.properties`). T
 5. **Losing or forfeiting ends the run.** Either way you earn **Rogue Tokens** to spend in the Rogue Shop.
 6. **Save & leave** any time between battles. Your real party comes back so you can play normally, and you can continue the run later from `/rogue`.
 
-With the mod installed on your client you get a **run screen** like Battle Tower's: your team (and your partner's in co-op) on the left, floor, badges and a floor tower up to the next gym in the middle, and the options on the right as cards, a grid or a list, themed with the biome's blocks. Coins sit in the top-right corner, **Close** in the bottom-left and **Back** (when there's somewhere to go back to) in the bottom-right. Without the mod on the client (server-only install) the same menus open as chests.
+With the mod installed on your client you get a **run screen** like Battle Tower's: your team (and your partner's in co-op) on the left, the options in the middle as cards, a grid or a list, and your progress (floor, badges and a floor tower up to the next gym) on the right, themed with the biome's blocks. It comes back by itself after every run battle. Coins sit in the top-right corner, **Close** in the bottom-left and **Back** (when there's somewhere to go back to) in the bottom-right. Without the mod on the client (server-only install) the same menus open as chests.
 
 Every run screen has a **nav bar** along the bottom:
 
@@ -68,7 +68,7 @@ Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue sav
   - Gym leaders from the 2nd gym, plus the Elite Four and the Champion, build teams around a plan: **Rain, Sun, Sandstorm, Snow, Trick Room, Tailwind** or **Electric / Psychic / Grassy Terrain**.
   - Each team has a setter that leads, abusers (Swift Swim, Chlorophyll, slow hard hitters under Trick Room…) and, in doubles, a Fake Out / Follow Me / Intimidate support.
   - Gyms pick a style that fits their type, and the battle preview shows it.
-- **Modifiers:** Nuzlocke, Solo, Hard, No Shop and All Doubles, each with a token bonus, and Counter Draft (a boss prep option to draft a counter Pokémon, no bonus).
+- **Modifiers:** Nuzlocke, Solo, Hard, No Shop and All Doubles, each with a token bonus, and Counter Draft (a boss prep option to draft a counter Pokémon, -25% tokens).
 - **Co-op runs** (inspired by Coop+):
   - Invite a friend from the start page or with `/rogue invite <player>`.
   - Each of you picks your own partner and keeps **up to 3 Pokémon**. Floors, badges and coins are shared.

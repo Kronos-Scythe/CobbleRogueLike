@@ -26,8 +26,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The run screen (Battle Tower style). In a run: party on the left, stats and the floor tower in
- * the middle, the options on the right. Outside a run the options take the whole width. Close sits
+ * The run screen (Battle Tower style). In a run: party on the left, the options in the middle,
+ * and the progress (stats and the floor tower) on the right. Outside a run the options take the whole width. Close sits
  * in the bottom-left corner, Back (when the screen has one) in the bottom-right, and footer
  * buttons in between. Everything is drawn from a {@link RogueView}; clicks go back to the server.
  */
@@ -85,7 +85,7 @@ public final class RogueScreen extends Screen {
 
     @Override
     protected void init() {
-        w = Math.min(420, width - 8);
+        w = Math.min(460, width - 8);
         h = Math.min(240, height - 8);
         x0 = (width - w) / 2;
         y0 = (height - h) / 2;
@@ -110,12 +110,18 @@ public final class RogueScreen extends Screen {
         return footerTop() - 5;
     }
 
+    /** Options in the middle (between the party and the progress panel in a run). */
     private int contentX() {
-        return view.run ? x0 + 6 + PARTY_W + GAP + CENTER_W + GAP : x0 + 6;
+        return view.run ? x0 + 6 + PARTY_W + GAP : x0 + 6;
     }
 
     private int contentW() {
-        return x0 + w - 6 - contentX();
+        return view.run ? w - 12 - PARTY_W - CENTER_W - 2 * GAP : w - 12;
+    }
+
+    /** The progress panel (stats and floor tower) on the right. */
+    private int progressX() {
+        return x0 + w - 6 - CENTER_W;
     }
 
     private int[] memberRect(int index) {
@@ -149,7 +155,7 @@ public final class RogueScreen extends Screen {
         Tooltip tooltip = new Tooltip();
         if (view.run) {
             renderParty(context, mouseX, mouseY, tooltip);
-            renderCenter(context);
+            renderProgress(context);
         }
         renderContent(context, mouseX, mouseY, tooltip);
         renderFooter(context, mouseX, mouseY, tooltip);
@@ -204,8 +210,8 @@ public final class RogueScreen extends Screen {
         }
     }
 
-    private void renderCenter(DrawContext context) {
-        int x = x0 + 6 + PARTY_W + GAP;
+    private void renderProgress(DrawContext context) {
+        int x = progressX();
         int top = bodyTop();
         int bottom = bodyBottom();
         tile(context, view.theme, x, top, CENTER_W, bottom - top, 0xD0101626);
