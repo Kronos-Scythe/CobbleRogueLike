@@ -65,7 +65,7 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
 
 ### Biomes, diversity and legendaries
 
-- **Biomes:** each stretch of floors between gyms takes place in one of 12 configurable biomes, and a new one is rolled after every gym without repeats. The 12 are Grasslands, Forest, Jungle, Desert, Savanna, Mountains, Ocean & Coast, Swamp, Tundra, Caves, Volcano and Mystic Grove.
+- **Biomes:** each Route card rolls its own biome (`nodeBiomes`, preferring ones not visited yet), shown with the biome's block; picking it makes that the current biome, which also themes trainers. A new biome is also rolled after every gym. The 12 are Grasslands, Forest, Jungle, Desert, Savanna, Mountains, Ocean & Coast, Swamp, Tundra, Caves, Volcano and Mystic Grove.
   - Each biome lists Minecraft/Cobblemon biome ids and tags (e.g. `#cobblemon:is_volcanic`) plus theme types.
 - **Wild Pokémon come from Cobblemon's real spawn data:** every `PokemonSpawnDetail` in the world spawn pool whose precomputed `validBiomes` touch the rogue biome.
   - Regional forms and datapack/addon spawns are included automatically.
@@ -163,7 +163,7 @@ Chosen on a setup screen before the partner picker. Each adds a Rogue Token bonu
 | Hard | Enemies +2 levels (plus max AI, archetypes and a tier bonus even if the config is set easier) | +50% |
 | No Shop | The run shop is closed (the bag still works) | +25% |
 | All Doubles | Every trainer battle is a double battle | +25% |
-| Counter Draft | Boss prep adds "Draft a counter": 1 of 3 Pokémon at the cap that beat the boss's type | none |
+| Counter Draft | Boss prep adds "Draft a counter": 1 of 3 Pokémon at the cap that beat the boss's type | -25% (`counterDraftTokenBonus`) |
 
 ### Move Tutor
 
@@ -301,7 +301,9 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
   - **Run screen** (client has the mod, `clientScreen: true`): `RogueViews` turns the menu plus the run into a `RogueView` (party with HP and held items, the partner's team in co-op, stats, a floor tower of the current segment with the gym on top, or the Elite Four and Champion), sent with `RogueNetwork.OpenView`. The client `RogueScreen` draws it:
     - Each slot has a `Menu.Role`: CONTENT (the options), INFO (description boxes above them), FOOTER (nav row, page arrows, secondary actions) or BACK. By default clickable slots are content, others info, and the nav row is the footer.
     - `Menu.Layout` picks how content is drawn: CARDS (a few big cards: hub, path, encounters, boss preview), GRID (icon tiles at their chest positions: partner picker, bag, invites), LIST (rows with a summary line: shop items, moves) or PAGE (text sections: How to play).
+    - In a run: party on the left, the options in the middle, progress (stats and tower) on the right.
     - Close is always bottom-left, Back bottom-right, footer buttons in between (icon-only when they don't fit).
+    - After a run battle (win, loss or interruption) the next screen opens by itself once Cobblemon has released the battle (`openWhenFree`, retried every second); ending a run shows the start page.
     - To avoid repeats, `Menu.chestOnly` hides slots the run screen already shows (coins, floor info, partner), and `Menu.screenTitle` gives shorter titles (no coin counts). How to play is only on the start page. Clicks come back as `RogueNetwork.Click(viewId, slot, button)`; stale views are ignored. `Menu.close` / `Menu.isOpen` cover both kinds of screen.
   - **Chest** (vanilla `GenericContainerScreenHandler` subclasses, `ui/MenuScreenHandler`): for clients without the mod. Clicks never move items.
   - **Biome theme:** each biome has a `block` (sand, snow, magma...). The run screen tiles it behind the stats and, on encounters, behind the wild Pokémon; chest encounters use it as filler.

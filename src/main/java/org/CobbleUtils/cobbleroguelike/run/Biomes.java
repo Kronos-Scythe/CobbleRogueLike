@@ -5,6 +5,7 @@ import org.CobbleUtils.cobbleroguelike.RogueConfig;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Random;
 
 /** Looks up and rolls rogue biomes (see {@link RogueConfig#biomes}). */
@@ -42,6 +43,30 @@ public final class Biomes {
             return biome.block;
         }
         return DEFAULT_BLOCKS.getOrDefault(biome.id, "minecraft:moss_block");
+    }
+
+    /**
+     * Picks a biome for a route card without marking it used: one not visited yet and not in
+     * {@code taken} (other cards on the same floor) if possible.
+     */
+    public static String pick(RunState state, Set<String> taken, Random random) {
+        List<RogueConfig.RogueBiome> biomes = RogueConfig.get().biomes;
+        if (biomes.isEmpty()) {
+            return FALLBACK.id;
+        }
+        List<String> fresh = new ArrayList<>();
+        List<String> any = new ArrayList<>();
+        for (RogueConfig.RogueBiome biome : biomes) {
+            if (taken.contains(biome.id)) {
+                continue;
+            }
+            any.add(biome.id);
+            if (!state.usedBiomes.contains(biome.id)) {
+                fresh.add(biome.id);
+            }
+        }
+        List<String> options = !fresh.isEmpty() ? fresh : !any.isEmpty() ? any : List.of(biomes.get(0).id);
+        return options.get(random.nextInt(options.size()));
     }
 
     /** Picks a biome not used yet this run (all of them once every biome has been visited). */

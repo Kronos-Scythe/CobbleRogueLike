@@ -436,8 +436,8 @@ public final class RogueConfig {
     public double hardTokenBonus = 0.5;
     public double noShopTokenBonus = 0.25;
     public double allDoublesTokenBonus = 0.25;
-    /** Counter Draft makes runs easier, so no bonus by default. */
-    public double draftTokenBonus = 0.0;
+    /** Counter Draft makes runs easier, so it costs tokens instead. */
+    public double counterDraftTokenBonus = -0.25;
 
     /** The /rogue shop reward catalog: real items, bought with Rogue Tokens and kept forever. */
     public List<ShopCategory> tokenShop = new ArrayList<>(List.of(

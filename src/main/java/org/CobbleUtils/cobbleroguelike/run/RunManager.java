@@ -360,8 +360,58 @@ public final class RunManager {
             message(player, "Finish your battle before ending the run.", Formatting.RED);
             return;
         }
-        finish(player, reason, false);
+        finishAndShowHub(player, reason, false, 0);
     }
+
+    /** Ends the run like {@link #finish}, then shows every member the start page. */
+    private void finishAndShowHub(ServerPlayerEntity player, String reason, boolean won, int delayTicks) {
+        RunState state = active.get(player.getUuid());
+        List<UUID> members = state != null ? new ArrayList<>(state.members()) : List.of(player.getUuid());
+        finish(player, reason, won);
+        for (UUID id : members) {
+            openWhenFree(id, delayTicks, p -> RogueMenus.hub(p, false));
+        }
+    }
+
+    /**
+     * Opens a screen for a player once they're out of battle. Cobblemon keeps the battle
+     * registered for a moment after it ends, so this waits (up to ~15 s) instead of giving up.
+     */
+    private void openWhenFree(UUID id, int delayTicks, java.util.function.Consumer<ServerPlayerEntity> open) {
+        Runnable attempt = new Runnable() {
+            int tries;
+
+            @Override
+            public void run() {
+                ServerPlayerEntity player = online(id);
+                if (player == null) {
+                    return;
+                }
+                if (CobblemonBridge.isInBattle(player)) {
+                    if (tries++ < 15) {
+                        Scheduler.runLater(20, this);
+                    }
+                    return;
+                }
+                open.accept(player);
+            }
+        };
+        if (delayTicks <= 0) {
+            attempt.run();
+        } else {
+            Scheduler.runLater(delayTicks, attempt);
+        }
+    }
+
+    /** After a rogue battle: bring the run screen back without the player typing /rogue. */
+    private void reopenAfterBattle(RunState state) {
+        for (UUID id : state.members()) {
+            openWhenFree(id, AFTER_BATTLE_TICKS, this::openCurrent);
+        }
+    }
+
+    /** Time to read the battle result before the run screen comes back. */
+    private static final int AFTER_BATTLE_TICKS = 40;
 
     /** Ends the run with a Rogue Token payout for the progress made, then restores the real party. */
     private void finish(ServerPlayerEntity player, String reason, boolean won) {
@@ -392,7 +442,7 @@ public final class RunManager {
         int floorsCleared = Math.max(0, state.floor - 1);
         int base = floorsCleared * config.tokensPerFloor + state.badges * config.tokensPerBadge
                 + (won ? config.championTokenBonus : 0);
-        int tokens = (int) Math.round(base * (1.0 + Modifiers.totalBonus(state.modifiers)));
+        int tokens = (int) Math.round(base * Math.max(0.0, 1.0 + Modifiers.totalBonus(state.modifiers)));
         NbtCompound profile = storage.readProfile(id);
         profile.putInt("tokens", profile.getInt("tokens") + tokens);
         profile.putInt("runs", profile.getInt("runs") + 1);
@@ -1296,6 +1346,13 @@ public final class RunManager {
         }
         switch (state.nodeChoices.get(index)) {
             case ROUTE -> {
+                String biome = index < state.nodeBiomes.size() ? state.nodeBiomes.get(index) : "";
+                if (!biome.isEmpty()) {
+                    state.biome = biome;
+                    if (!state.usedBiomes.contains(biome)) {
+                        state.usedBiomes.add(biome);
+                    }
+                }
                 state.encounterOptions = rollEncounters(state);
                 state.coopPicks.clear();
                 state.coopOptions.clear();
@@ -1386,12 +1443,13 @@ public final class RunManager {
         }
         state.ready.clear();
         if (won == null) {
-            tell(state, "The battle was interrupted. Use /rogue to challenge again.", Formatting.YELLOW);
+            tell(state, "The battle was interrupted. You can challenge it again.", Formatting.YELLOW);
+            reopenAfterBattle(state);
             return;
         }
         if (!won) {
-            finish(player, (state.isCoop() ? "You were both defeated" : "You blacked out") + " on floor " + state.floor
-                    + " with " + state.badges + " badge" + (state.badges == 1 ? "" : "s") + ". Your run is over.", false);
+            finishAndShowHub(player, (state.isCoop() ? "You were both defeated" : "You blacked out") + " on floor " + state.floor
+                    + " with " + state.badges + " badge" + (state.badges == 1 ? "" : "s") + ". Your run is over.", false, AFTER_BATTLE_TICKS);
             return;
         }
         int reward = battleReward(state);
@@ -1400,14 +1458,14 @@ public final class RunManager {
             for (ServerPlayerEntity member : onlineMembers(state)) {
                 releaseFainted(member);
                 if (CobblemonBridge.partyMembers(member).isEmpty()) {
-                    finish(member, member.getName().getString() + " has no Pokémon left. The run is over.", false);
+                    finishAndShowHub(member, member.getName().getString() + " has no Pokémon left. The run is over.", false, AFTER_BATTLE_TICKS);
                     return;
                 }
             }
         }
         switch (state.battleKind) {
             case CHAMPION -> {
-                finish(player, "You defeated " + state.battleName + "! Your run is complete!", true);
+                finishAndShowHub(player, "You defeated " + state.battleName + "! Your run is complete!", true, AFTER_BATTLE_TICKS);
                 return;
             }
             case GYM -> {
@@ -1447,7 +1505,7 @@ public final class RunManager {
                     state.clearBattle();
                     advanceFloor(state);
                     save(player, state);
-                    onlineMembers(state).forEach(this::openCurrent);
+                    reopenAfterBattle(state);
                     return;
                 }
                 String recruit = state.battleTeam.get(0);
@@ -1464,10 +1522,11 @@ public final class RunManager {
                     }
                     advanceFloor(state);
                     save(player, state);
-                    onlineMembers(state).forEach(this::openCurrent);
+                    reopenAfterBattle(state);
                 } else {
                     message(player, name + " joins your team!", Formatting.LIGHT_PURPLE);
-                    recruit(player, state, recruit);
+                    recruit(player, state, recruit, false);
+                    reopenAfterBattle(state);
                 }
                 return;
             }
@@ -1478,7 +1537,7 @@ public final class RunManager {
         state.clearBattle();
         advanceFloor(state);
         save(player, state);
-        onlineMembers(state).forEach(this::openCurrent);
+        reopenAfterBattle(state);
     }
 
     private List<ServerPlayerEntity> onlineMembers(RunState state) {
@@ -1514,7 +1573,7 @@ public final class RunManager {
                 return;
             }
             if (active.containsKey(id) || storage.hasJournal(id)) {
-                finish(player, "You ended the battle and your run.", false);
+                finishAndShowHub(player, "You ended the battle and your run.", false, AFTER_BATTLE_TICKS);
             } else {
                 message(player, "Battle ended.", Formatting.GOLD);
             }
@@ -1551,6 +1610,10 @@ public final class RunManager {
 
     /** Adds a rogue Pokémon to the party, going through the release screen if it's full. */
     private void recruit(ServerPlayerEntity player, RunState state, String properties) {
+        recruit(player, state, properties, true);
+    }
+
+    private void recruit(ServerPlayerEntity player, RunState state, String properties, boolean open) {
         state.encounterOptions.clear();
         if (CobblemonBridge.partyMembers(player).size() >= partyLimit(state)) {
             state.pendingEncounter = properties;
@@ -1560,7 +1623,9 @@ public final class RunManager {
             advanceFloor(state);
         }
         save(player, state);
-        openCurrent(player);
+        if (open) {
+            openCurrent(player);
+        }
     }
 
     /** Current run level cap for a player, or -1 if they aren't in a run. */
@@ -1641,6 +1706,15 @@ public final class RunManager {
         state.floor++;
         state.phase = Phase.CHOOSE_NODE;
         state.nodeChoices = rollNodes(state);
+        // Each route card leads through its own biome (Emerald Rogue style).
+        state.nodeBiomes = new ArrayList<>();
+        Set<String> taken = new HashSet<>();
+        Random random = rng(state, 7);
+        for (NodeType node : state.nodeChoices) {
+            String biome = node == NodeType.ROUTE ? Biomes.pick(state, taken, random) : "";
+            taken.add(biome);
+            state.nodeBiomes.add(biome);
+        }
     }
 
     /** Coins for beating the prepared battle: base + strongest level * perLevel, multiplied for bosses. */

@@ -62,6 +62,8 @@ public final class RunState {
     public int eliteStartFloor = -1;
     public List<String> usedEliteTypes = new ArrayList<>();
     public List<NodeType> nodeChoices = new ArrayList<>();
+    /** Biome of each path card (route cards only; "" for the others), parallel to nodeChoices. */
+    public List<String> nodeBiomes = new ArrayList<>();
     /** Property strings, e.g. {@code "zubat level=7"}. */
     public List<String> encounterOptions = new ArrayList<>();
     /** Encounter waiting for a party slot while in {@link Phase#RELEASE}. */
@@ -169,6 +171,7 @@ public final class RunState {
         tag.putInt("eliteStartFloor", eliteStartFloor);
         tag.put("usedEliteTypes", writeStrings(usedEliteTypes));
         tag.put("nodeChoices", writeStrings(nodeChoices.stream().map(Enum::name).toList()));
+        tag.put("nodeBiomes", writeStrings(nodeBiomes));
         tag.put("encounterOptions", writeStrings(encounterOptions));
         tag.putString("pendingEncounter", pendingEncounter);
         tag.putString("battleKind", battleKind.name());
@@ -230,6 +233,7 @@ public final class RunState {
                 state.nodeChoices.add(type);
             }
         }
+        state.nodeBiomes = readStrings(tag, "nodeBiomes");
         state.encounterOptions = readStrings(tag, "encounterOptions");
         state.pendingEncounter = tag.getString("pendingEncounter");
         state.battleKind = parse(NodeType.class, tag.getString("battleKind"), NodeType.TRAINER);
