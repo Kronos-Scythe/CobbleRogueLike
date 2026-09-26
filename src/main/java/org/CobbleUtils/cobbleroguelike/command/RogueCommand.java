@@ -1,6 +1,7 @@
 package org.CobbleUtils.cobbleroguelike.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -8,15 +9,19 @@ import net.minecraft.text.Text;
 import org.CobbleUtils.cobbleroguelike.RogueConfig;
 import org.CobbleUtils.cobbleroguelike.compat.SpawnData;
 import org.CobbleUtils.cobbleroguelike.run.RunManager;
+import org.CobbleUtils.cobbleroguelike.ui.RewardMenus;
+import org.CobbleUtils.cobbleroguelike.ui.TutorMenus;
 
 import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
 
 /**
- * {@code /rogue} opens the menu. {@code /rogue end} ends the run. {@code /rogue endbattle} force-stops
+ * {@code /rogue} opens the menu. {@code /rogue shop} spends Rogue Tokens on real items.
+ * {@code /rogue tutor} opens the run's Move Tutor. {@code /rogue end} ends the run. {@code /rogue endbattle} force-stops
  * the current battle and ends the run. {@code /rogue clean} force-cleans leftover run data and gives
  * back the saved party.
- * Admin: {@code /rogue admin end|endbattle|clean <player>}, {@code /rogue admin reload}.
+ * Admin: {@code /rogue admin end|endbattle|clean <player>}, {@code /rogue admin tokens <player> <amount>},
+ * {@code /rogue admin reload}.
  */
 public final class RogueCommand {
 
@@ -36,6 +41,14 @@ public final class RogueCommand {
                         return 0;
                     }
                     RunManager.get().end(player, "You ended your run.");
+                    return 1;
+                }))
+                .then(literal("shop").executes(ctx -> {
+                    RewardMenus.shop(ctx.getSource().getPlayerOrThrow());
+                    return 1;
+                }))
+                .then(literal("tutor").executes(ctx -> {
+                    TutorMenus.pickPokemon(ctx.getSource().getPlayerOrThrow());
                     return 1;
                 }))
                 .then(literal("endbattle").executes(ctx -> {
@@ -72,6 +85,16 @@ public final class RogueCommand {
                                     + " rogue run data for " + target.getName().getString()), true);
                             return cleaned ? 1 : 0;
                         })))
+                        .then(literal("tokens").then(argument("player", EntityArgumentType.player())
+                                .then(argument("amount", IntegerArgumentType.integer()).executes(ctx -> {
+                                    ServerPlayerEntity target = EntityArgumentType.getPlayer(ctx, "player");
+                                    int amount = IntegerArgumentType.getInteger(ctx, "amount");
+                                    boolean ok = RunManager.get().changeTokens(target, amount);
+                                    int total = RunManager.get().tokens(target);
+                                    ctx.getSource().sendFeedback(() -> Text.literal((ok ? "Changed" : "Could not change")
+                                            + " Rogue Tokens for " + target.getName().getString() + " (now " + total + ")"), true);
+                                    return ok ? 1 : 0;
+                                }))))
                         .then(literal("reload").executes(ctx -> {
                             RogueConfig.load();
                             SpawnData.clearCache();

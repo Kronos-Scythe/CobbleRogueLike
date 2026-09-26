@@ -281,16 +281,67 @@ public final class RunManager {
             message(player, "Finish your battle before ending the run.", Formatting.RED);
             return;
         }
-        finish(player, reason);
+        finish(player, reason, false);
     }
 
-    private void finish(ServerPlayerEntity player, String reason) {
+    /** Ends the run with a Rogue Token payout for the progress made, then restores the real party. */
+    private void finish(ServerPlayerEntity player, String reason, boolean won) {
+        RunState state = active.get(player.getUuid());
         try {
             restore(player);
             message(player, reason + " Your party has been restored.", Formatting.GOLD);
+            if (state != null) {
+                payOut(player, state, won);
+            }
         } catch (IOException | RuntimeException e) {
             Cobbleroguelike.LOGGER.error("Failed to end rogue run for {}", player.getName().getString(), e);
             message(player, "Failed to restore your party. Nothing was lost; ask an admin to check the log.", Formatting.RED);
+        }
+    }
+
+    private void payOut(ServerPlayerEntity player, RunState state, boolean won) {
+        RogueConfig config = RogueConfig.get();
+        int floorsCleared = Math.max(0, state.floor - 1);
+        int tokens = floorsCleared * config.tokensPerFloor + state.badges * config.tokensPerBadge
+                + (won ? config.championTokenBonus : 0);
+        NbtCompound profile = storage.readProfile(player.getUuid());
+        profile.putInt("tokens", profile.getInt("tokens") + tokens);
+        profile.putInt("runs", profile.getInt("runs") + 1);
+        profile.putInt("wins", profile.getInt("wins") + (won ? 1 : 0));
+        profile.putInt("bestFloor", Math.max(profile.getInt("bestFloor"), state.floor));
+        profile.putInt("bestBadges", Math.max(profile.getInt("bestBadges"), state.badges));
+        saveProfile(player, profile);
+        message(player, "+" + tokens + " Rogue Tokens (" + profile.getInt("tokens")
+                + " total). Spend them with /rogue shop.", Formatting.LIGHT_PURPLE);
+    }
+
+    /** The player's persistent profile: tokens, runs, wins, bestFloor, bestBadges. */
+    public NbtCompound profile(ServerPlayerEntity player) {
+        return storage.readProfile(player.getUuid());
+    }
+
+    public int tokens(ServerPlayerEntity player) {
+        return profile(player).getInt("tokens");
+    }
+
+    /** Adds (or with a negative amount, removes) tokens. Returns false if it would go below zero. */
+    public boolean changeTokens(ServerPlayerEntity player, int amount) {
+        NbtCompound profile = profile(player);
+        int updated = profile.getInt("tokens") + amount;
+        if (updated < 0) {
+            return false;
+        }
+        profile.putInt("tokens", updated);
+        return saveProfile(player, profile);
+    }
+
+    private boolean saveProfile(ServerPlayerEntity player, NbtCompound profile) {
+        try {
+            storage.writeProfile(player.getUuid(), profile);
+            return true;
+        } catch (IOException e) {
+            Cobbleroguelike.LOGGER.error("Failed to save rogue profile for {}", player.getName().getString(), e);
+            return false;
         }
     }
 
@@ -425,9 +476,14 @@ public final class RunManager {
         for (String properties : state.battleTeam) {
             team.add(CobblemonBridge.create(properties));
         }
+        boolean doubles = state.battleDoubles;
+        if (doubles && CobblemonBridge.healthyCount(player) < 2) {
+            doubles = false;
+            message(player, "You only have one Pokémon able to fight, so this is a single battle.", Formatting.YELLOW);
+        }
         PokemonBattle battle = state.battleKind == NodeType.LEGENDARY
                 ? CobblemonBattles.startWildBattle(player, state.battleTeam.get(0), state.battleSkill)
-                : CobblemonBattles.startTrainerBattle(player, state.battleName, team, state.battleSkill);
+                : CobblemonBattles.startTrainerBattle(player, state.battleName, team, state.battleSkill, doubles);
         if (battle == null) {
             message(player, "The battle couldn't start. Is your lead Pokémon able to fight?", Formatting.RED);
             return;
@@ -460,14 +516,14 @@ public final class RunManager {
         }
         if (!won) {
             finish(player, "You blacked out on floor " + state.floor + " with " + state.badges + " badge"
-                    + (state.badges == 1 ? "" : "s") + ". Your run is over.");
+                    + (state.badges == 1 ? "" : "s") + ". Your run is over.", false);
             return;
         }
         int reward = battleReward(state);
         state.money += reward;
         switch (state.battleKind) {
             case CHAMPION -> {
-                finish(player, "You defeated " + state.battleName + "! Your run is complete!");
+                finish(player, "You defeated " + state.battleName + "! Your run is complete!", true);
                 return;
             }
             case GYM -> {
@@ -520,7 +576,7 @@ public final class RunManager {
                 return;
             }
             if (active.containsKey(id) || storage.hasJournal(id)) {
-                finish(player, "You ended the battle and your run.");
+                finish(player, "You ended the battle and your run.", false);
             } else {
                 message(player, "Battle ended.", Formatting.GOLD);
             }

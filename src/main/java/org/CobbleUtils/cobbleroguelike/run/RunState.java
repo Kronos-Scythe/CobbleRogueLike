@@ -50,6 +50,7 @@ public final class RunState {
     public String battleType = "";
     public List<String> battleTeam = new ArrayList<>();
     public int battleSkill = 0;
+    public boolean battleDoubles = false;
 
     public RunState(UUID playerId, long seed) {
         this.playerId = playerId;
@@ -84,6 +85,7 @@ public final class RunState {
         battleType = "";
         battleTeam = new ArrayList<>();
         battleSkill = 0;
+        battleDoubles = false;
     }
 
     public NbtCompound toNbt() {
@@ -110,6 +112,7 @@ public final class RunState {
         tag.putString("battleType", battleType);
         tag.put("battleTeam", writeStrings(battleTeam));
         tag.putInt("battleSkill", battleSkill);
+        tag.putBoolean("battleDoubles", battleDoubles);
         return tag;
     }
 
@@ -145,6 +148,7 @@ public final class RunState {
         state.battleType = tag.getString("battleType");
         state.battleTeam = readStrings(tag, "battleTeam");
         state.battleSkill = tag.getInt("battleSkill");
+        state.battleDoubles = tag.getBoolean("battleDoubles");
         return state;
     }
 

@@ -20,6 +20,7 @@ import java.util.UUID;
  *     <li>{@code journals/<uuid>.dat}: the player's real party, written before the swap and
  *     deleted only after it has been restored.</li>
  *     <li>{@code runs/<uuid>.dat}: run progress, written once the swap has completed.</li>
+ *     <li>{@code profiles/<uuid>.dat}: Rogue Tokens and lifetime stats.</li>
  * </ul>
  * Writes go to a temp file first, so a crash mid-write never leaves a truncated file behind.
  */
@@ -27,11 +28,13 @@ public final class RunStorage {
 
     private final Path journals;
     private final Path runs;
+    private final Path profiles;
 
     public RunStorage(MinecraftServer server) {
         Path root = server.getSavePath(WorldSavePath.ROOT).resolve(Cobbleroguelike.MOD_ID);
         this.journals = root.resolve("journals");
         this.runs = root.resolve("runs");
+        this.profiles = root.resolve("profiles");
     }
 
     public boolean hasJournal(UUID id) {
@@ -64,6 +67,24 @@ public final class RunStorage {
 
     public void deleteRun(UUID id) throws IOException {
         Files.deleteIfExists(runFile(id));
+    }
+
+    /** Per-player data that outlives runs: Rogue Tokens and stats. Empty if none yet. */
+    public NbtCompound readProfile(UUID id) {
+        Path file = profiles.resolve(id + ".dat");
+        if (!Files.exists(file)) {
+            return new NbtCompound();
+        }
+        try {
+            return read(file);
+        } catch (IOException e) {
+            Cobbleroguelike.LOGGER.error("Failed to read rogue profile {}", id, e);
+            return new NbtCompound();
+        }
+    }
+
+    public void writeProfile(UUID id, NbtCompound tag) throws IOException {
+        write(profiles.resolve(id + ".dat"), tag);
     }
 
     private Path journalFile(UUID id) {

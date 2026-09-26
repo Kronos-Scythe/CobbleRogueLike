@@ -324,6 +324,91 @@ public final class RogueConfig {
         }
     }
 
+    // ---------------------------------------------------------------- doubles & teams
+
+    /** Which run battles are double battles: "bosses" (gyms + Champion), "all" or "none". */
+    public String doubleBattles = "bosses";
+    /** With "bosses", the chance that a normal trainer also battles in doubles. */
+    public double doubleTrainerChance = 0.2;
+
+    // ---------------------------------------------------------------- move tutor
+
+    /** Coins to teach a TM/tutor/egg move. Level-up moves the Pokémon already qualifies for are free. */
+    public int moveTutorPrice = 800;
+
+    // ---------------------------------------------------------------- rewards (/rogue shop)
+
+    /** Rogue Tokens paid when a run ends: per floor cleared, per badge, and a bonus for beating the Champion. */
+    public int tokensPerFloor = 2;
+    public int tokensPerBadge = 15;
+    public int championTokenBonus = 100;
+
+    /** The /rogue shop reward catalog: real items, bought with Rogue Tokens and kept forever. */
+    public List<ShopCategory> tokenShop = new ArrayList<>(List.of(
+            new ShopCategory("Nature Mints", "cobblemon:adamant_mint", "give", List.of(
+                    new ShopEntry("cobblemon:adamant_mint", 40),
+                    new ShopEntry("cobblemon:bold_mint", 40),
+                    new ShopEntry("cobblemon:brave_mint", 40),
+                    new ShopEntry("cobblemon:calm_mint", 40),
+                    new ShopEntry("cobblemon:careful_mint", 40),
+                    new ShopEntry("cobblemon:gentle_mint", 40),
+                    new ShopEntry("cobblemon:hasty_mint", 40),
+                    new ShopEntry("cobblemon:impish_mint", 40),
+                    new ShopEntry("cobblemon:jolly_mint", 40),
+                    new ShopEntry("cobblemon:lax_mint", 40),
+                    new ShopEntry("cobblemon:lonely_mint", 40),
+                    new ShopEntry("cobblemon:mild_mint", 40),
+                    new ShopEntry("cobblemon:modest_mint", 40),
+                    new ShopEntry("cobblemon:naive_mint", 40),
+                    new ShopEntry("cobblemon:naughty_mint", 40),
+                    new ShopEntry("cobblemon:quiet_mint", 40),
+                    new ShopEntry("cobblemon:rash_mint", 40),
+                    new ShopEntry("cobblemon:relaxed_mint", 40),
+                    new ShopEntry("cobblemon:sassy_mint", 40),
+                    new ShopEntry("cobblemon:serious_mint", 40),
+                    new ShopEntry("cobblemon:timid_mint", 40))),
+            new ShopCategory("Training", "cobblemon:ability_capsule", "give", List.of(
+                    new ShopEntry("cobblemon:ability_capsule", 60),
+                    new ShopEntry("cobblemon:ability_patch", 150),
+                    new ShopEntry("cobblemon:pp_up", 25),
+                    new ShopEntry("cobblemon:pp_max", 60),
+                    new ShopEntry("cobblemon:hp_up", 15),
+                    new ShopEntry("cobblemon:protein", 15),
+                    new ShopEntry("cobblemon:iron", 15),
+                    new ShopEntry("cobblemon:calcium", 15),
+                    new ShopEntry("cobblemon:zinc", 15),
+                    new ShopEntry("cobblemon:carbos", 15))),
+            new ShopCategory("Breeding & Utility", "cobblemon:destiny_knot", "give", List.of(
+                    new ShopEntry("cobblemon:destiny_knot", 120),
+                    new ShopEntry("cobblemon:everstone", 30),
+                    new ShopEntry("cobblemon:power_weight", 60),
+                    new ShopEntry("cobblemon:power_bracer", 60),
+                    new ShopEntry("cobblemon:power_belt", 60),
+                    new ShopEntry("cobblemon:power_lens", 60),
+                    new ShopEntry("cobblemon:power_band", 60),
+                    new ShopEntry("cobblemon:power_anklet", 60),
+                    new ShopEntry("cobblemon:exp_share", 80),
+                    new ShopEntry("cobblemon:lucky_egg", 100),
+                    new ShopEntry("cobblemon:soothe_bell", 40))),
+            new ShopCategory("Special Balls", "cobblemon:beast_ball", "give", List.of(
+                    new ShopEntry("cobblemon:love_ball", 20),
+                    new ShopEntry("cobblemon:moon_ball", 20),
+                    new ShopEntry("cobblemon:friend_ball", 20),
+                    new ShopEntry("cobblemon:lure_ball", 20),
+                    new ShopEntry("cobblemon:heavy_ball", 20),
+                    new ShopEntry("cobblemon:level_ball", 20),
+                    new ShopEntry("cobblemon:fast_ball", 20),
+                    new ShopEntry("cobblemon:sport_ball", 20),
+                    new ShopEntry("cobblemon:safari_ball", 20),
+                    new ShopEntry("cobblemon:park_ball", 20),
+                    new ShopEntry("cobblemon:premier_ball", 20),
+                    new ShopEntry("cobblemon:luxury_ball", 20),
+                    new ShopEntry("cobblemon:heal_ball", 20),
+                    new ShopEntry("cobblemon:dream_ball", 30),
+                    new ShopEntry("cobblemon:beast_ball", 30),
+                    new ShopEntry("cobblemon:cherish_ball", 50),
+                    new ShopEntry("cobblemon:master_ball", 750)))));
+
     /** Root commands a non-op player cannot run during a run. */
     public List<String> blockedCommands = new ArrayList<>(List.of("pc", "trade"));
 

@@ -248,6 +248,17 @@ public final class CobblemonBridge {
         return Text.translatable(pokemon.getAbility().getDisplayName());
     }
 
+    /** Party members that can still fight. */
+    public static int healthyCount(ServerPlayerEntity player) {
+        int count = 0;
+        for (Pokemon pokemon : party(player)) {
+            if (pokemon.getCurrentHealth() > 0) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public static void healParty(ServerPlayerEntity player) {
         party(player).heal();
     }

@@ -30,7 +30,11 @@ public final class RogueMenus {
     public static void hub(ServerPlayerEntity player, boolean confirmAbandon) {
         Menu menu = new Menu(Text.literal("CobbleRogue"));
         if (!RunManager.isInRun(player)) {
-            menu.button(13, Menu.stack("cobblemon:poke_ball", Text.literal("Start a run").formatted(Formatting.GREEN), List.of(
+            menu.button(15, Menu.stack("minecraft:amethyst_shard", Text.literal("Rogue Shop").formatted(Formatting.LIGHT_PURPLE), List.of(
+                    Text.literal(RunManager.get().tokens(player) + " Rogue Tokens"),
+                    Text.literal("Spend tokens from past runs on real items."))),
+                    RewardMenus::shop);
+            menu.button(11, Menu.stack("cobblemon:poke_ball", Text.literal("Start a run").formatted(Formatting.GREEN), List.of(
                     Text.literal("Pick one of your own Pokémon as your"),
                     Text.literal("only partner and build a team as you go."),
                     Text.literal(""),
@@ -41,7 +45,8 @@ public final class RogueMenus {
             menu.button(11, Menu.stack("minecraft:lime_concrete", Text.literal("Keep playing").formatted(Formatting.GREEN), List.of()),
                     p -> RunManager.get().openCurrent(p));
             menu.button(15, Menu.stack("minecraft:red_concrete", Text.literal("Yes, end my run").formatted(Formatting.RED), List.of(
-                    Text.literal("Your run Pokémon will be lost."))),
+                    Text.literal("Your run Pokémon will be lost."),
+                    Text.literal("You still get Rogue Tokens for your progress."))),
                     p -> RunManager.get().end(p, "You ended your run."));
         } else {
             RunState state = RunManager.get().state(player);
@@ -142,11 +147,13 @@ public final class RogueMenus {
                         Text.literal("Gym battle").formatted(Formatting.GOLD, Formatting.BOLD), List.of(
                                 Text.literal("Badge " + (state.badges + 1) + " of " + RogueConfig.get().gymCount + "."),
                                 Text.literal("Leader's ace is Lv. " + Scaling.levelCap(state.badges) + "."),
+                                Text.literal(bossDoubles() ? "Double battle, competitive sets." : "Competitive sets.").formatted(Formatting.YELLOW),
                                 Text.literal("Losing ends the run!").formatted(Formatting.RED))),
                         p -> RunManager.get().chooseNode(p, index));
                 case CHAMPION -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:dragon_head",
                         Text.literal("The Champion").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), List.of(
                                 Text.literal("The final battle, Lv. " + Scaling.levelCap(state.badges) + "."),
+                                Text.literal(bossDoubles() ? "Double battle, full competitive team." : "Full competitive team.").formatted(Formatting.YELLOW),
                                 Text.literal("Win to complete your run!"))),
                         p -> RunManager.get().chooseNode(p, index));
                 case LEGENDARY -> menu.button(CHOICE_SLOTS[i], Menu.stack("minecraft:nether_star",
@@ -178,6 +185,9 @@ public final class RogueMenus {
         if (!state.battleType.isEmpty()) {
             lore.add(Text.literal("Type: " + TrainerGenerator.capitalize(state.battleType)).formatted(Formatting.YELLOW));
         }
+        if (state.battleDoubles) {
+            lore.add(Text.literal("Double Battle!").formatted(Formatting.AQUA, Formatting.BOLD));
+        }
         if (legendary) {
             lore.add(Text.literal(describeProperties(state.battleTeam.get(0))).formatted(Formatting.LIGHT_PURPLE));
             lore.add(Text.literal("Defeat it and it joins your team!").formatted(Formatting.GREEN));
@@ -199,6 +209,10 @@ public final class RogueMenus {
                 p -> RunManager.get().startBattle(p));
         addControls(menu, state);
         menu.open(player);
+    }
+
+    private static boolean bossDoubles() {
+        return !RogueConfig.get().doubleBattles.equalsIgnoreCase("none");
     }
 
     private static int levelOf(String properties) {
@@ -257,6 +271,8 @@ public final class RogueMenus {
                 Text.literal("Healing, battle items, training..."))), ShopMenus::shop);
         menu.button(20, Menu.stack("minecraft:chest", Text.literal("Bag & team items").formatted(Formatting.AQUA), List.of(
                 Text.literal("Use items and manage held items."))), p -> ShopMenus.bag(p, 0));
+        menu.button(21, Menu.stack("minecraft:enchanted_book", Text.literal("Move Tutor").formatted(Formatting.LIGHT_PURPLE), List.of(
+                Text.literal("Teach TM, tutor and egg moves."))), TutorMenus::pickPokemon);
         menu.button(26, Menu.stack("minecraft:barrier", Text.literal("End run").formatted(Formatting.RED), List.of()),
                 p -> hub(p, true));
     }

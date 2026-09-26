@@ -79,6 +79,25 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
   - Beating it recruits a rogue copy, going through the release screen if the party is full. Players can also walk away from the preview.
   - Tiers by badges: BST ≤ 600, then ≤ 680, then any. Box legendaries unlock at 6 badges. Ultra Beasts and paradoxes can be turned off in the config.
 
+### Doubles and competitive teams
+
+- `doubleBattles`: `bosses` (default: gyms and the Champion are **double battles**, plus 20% of normal trainers), `all`, or `none`. If the player has fewer than 2 Pokémon able to fight, the battle falls back to singles.
+- Boss teams are upgraded by `TeamBuilder`:
+  - **Moves:** scored by power, accuracy, STAB and the matching attack stat, with a type-diversity bonus. Recharge, self-KO and AI-unfriendly moves are excluded.
+  - **Support move:** one per Pokémon. Protect, Fake Out, Tailwind, Follow Me or Trick Room in doubles; setup or recovery in singles.
+  - **Held items:** by role (attacker, bulky, not fully evolved → Eviolite, doubles → Sash, Sitrus, Safety Goggles...), with no duplicates on a team. Choice items drop the support move.
+  - **Nature:** chosen by role.
+- Tiers:
+  - First gym: best level-up moves, and only the ace holds an item.
+  - Gyms 2–4: adds TM, tutor and egg moves, items for everyone, natures and perfect IVs.
+  - Gym 5 and later, and the Champion: adds full EV spreads.
+  - Normal trainers get the best level-up movesets, and their ace holds an item from 4 badges on.
+
+### Move Tutor
+
+- Open it from any run screen (or `/rogue tutor`). Level-up moves the Pokémon already qualifies for are **free**. TM, tutor, egg and legacy moves cost `moveTutorPrice` coins (800).
+- You choose which move to replace, and the replaced move is benched, so the Cobblemon summary screen can swap it back in.
+
 ### Battles
 
 - Each battle **spawns a temporary Cobblemon NPC** (class `cobbleroguelike:rogue_trainer`, standard model, no AI, invulnerable) a few blocks in front of the player. It is fought through `NPCBattleActor` with `StrongBattleAI`, at skill 1–5 as badges rise (gyms start one step higher). Cobblemon only sends out a trainer's Pokémon at battle start when the trainer has an entity, so an entity-less `TrainerBattleActor` left the battle stuck forever. The NPC is despawned 3 s after the battle ends. NPCs are tagged `cobbleroguelike_trainer`, and any left behind by a crash are removed when their chunk loads.
@@ -154,13 +173,11 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
 
 ## 5. Rewards that don't break gym progression
 
-**Paid out at the end of a run, scaled by badges earned, modifiers and quests:**
+**Rogue Tokens (done):** paid whenever a run ends: 2 per floor cleared, 15 per badge, and +100 for beating the Champion. They're stored in `profiles/<uuid>.dat` along with runs, wins and best floor/badges.
 
-- **Rogue Tokens** (meta currency), spent at a main-world vendor on:
-  - mints, Ability Capsules and Patches, Bottle Caps, IV/EV items
-  - cosmetic Poké Balls, trainer skins, titles
-  - held-item *access*, not power (e.g. one Choice item per completed Champion run), configurable
-- **Optional:** a *level-1 egg* of one species from a winning run. It keeps the hall-of-fame feeling without skipping gym caps. This is off by default and server-configurable.
+- **`/rogue shop`** (also on the hub; no world vendor) spends tokens on **real items** for the player's inventory: all 21 mints, Ability Capsule/Patch, PP Up/Max, vitamins, Destiny Knot, Everstone, Power items, Exp. Share, Lucky Egg, Soothe Bell and special Poké Balls (Master Ball at 750). The catalog and prices are in `tokenShop` in the config.
+- `/rogue admin tokens <player> <amount>` adds or removes tokens.
+- **Optional (not built):** a *level-1 egg* of one species from a winning run.
 
 **Never paid out:** leveled Pokémon, Rare Candies, EXP items above the player's current main-world cap, or badges and progression flags.
 
@@ -196,6 +213,6 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
 1. **Done (untested build):** journaled party swap and restore, crash recovery, guards, `/rogue` menus, partner picker (a copy of your own Pokémon), route (pick 1 of 3), rest, and the release screen.
 2. **Done (untested build):** trainer nodes, gyms every 5 floors, the Champion, run level cap, losing ends the run.
 3. **Done (untested build):** run coins, an always-open shop, the run bag with held-item management, and optional Mega Showdown gimmicks. Next: using bag items during battles, and gimmicks for gym leaders.
-4. **Meta:** the quest board, Rogue Tokens and the vendor.
+4. **Meta:** Rogue Tokens and `/rogue shop` are done. The quest board is still to come.
 5. **Modifiers:** Nuzlocke, Solo, Doubles, Rainbow, Gauntlet.
 6. **Co-op:** invites, multi battles.

@@ -2,12 +2,15 @@ package org.CobbleUtils.cobbleroguelike.run;
 
 import org.CobbleUtils.cobbleroguelike.RogueConfig;
 import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
+import org.CobbleUtils.cobbleroguelike.compat.TeamBuilder;
 import org.CobbleUtils.cobbleroguelike.run.RunState.NodeType;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.Set;
 
 /** Fills a {@link RunState} with the next battle: a random trainer, a typed gym, or the Champion. */
 public final class TrainerGenerator {
@@ -27,6 +30,12 @@ public final class TrainerGenerator {
         state.clearBattle();
         state.battleKind = kind;
         String name = NAMES[random.nextInt(NAMES.length)];
+        boolean boss = kind == NodeType.GYM || kind == NodeType.CHAMPION;
+        boolean doubles = switch (config.doubleBattles.toLowerCase(Locale.ROOT)) {
+            case "all" -> true;
+            case "none" -> false;
+            default -> boss || random.nextDouble() < config.doubleTrainerChance;
+        };
         switch (kind) {
             case GYM -> {
                 String type = pickGymType(state, random);
@@ -47,10 +56,14 @@ public final class TrainerGenerator {
                     // Nothing eligible (e.g. legendaries disabled by datapack): fall back to a trainer.
                     prepare(state, NodeType.TRAINER, random);
                 }
+                return; // legendary encounters are always singles and use their natural set
             }
             default -> {
                 int level = Scaling.trainerLevel(state);
                 int size = Math.min(6, 1 + state.badges / 2 + random.nextInt(2));
+                if (doubles) {
+                    size = Math.max(2, size);
+                }
                 state.battleName = TRAINER_CLASSES[random.nextInt(TRAINER_CLASSES.length)] + " " + name;
                 state.battleSkill = Math.min(5, 1 + state.badges / 2);
                 // Themed by the current biome: its real spawns and its types.
@@ -60,6 +73,46 @@ public final class TrainerGenerator {
                         : buildTeam(null, size, level, false, false, random);
             }
         }
+        state.battleDoubles = doubles && state.battleTeam.size() >= 2;
+        state.battleTeam = strengthen(state, state.battleDoubles, random);
+    }
+
+    /**
+     * Upgrades the prepared team into competitive sets (see {@link TeamBuilder}).
+     * <ul>
+     *     <li>Gyms: tier 0 at the first gym, tier 1 until 4 badges, then tier 2. Everyone holds
+     *     an item from the second gym on (only the ace at the first).</li>
+     *     <li>The Champion: tier 2, and everyone holds an item.</li>
+     *     <li>Normal trainers: tier 0 movesets; the ace holds an item from 4 badges on.</li>
+     * </ul>
+     * Items follow the item clause (no duplicates).
+     */
+    private static List<String> strengthen(RunState state, boolean doubles, Random random) {
+        int tier;
+        boolean itemsForAll;
+        switch (state.battleKind) {
+            case GYM -> {
+                tier = state.badges == 0 ? 0 : state.badges < 4 ? 1 : 2;
+                itemsForAll = tier >= 1;
+            }
+            case CHAMPION -> {
+                tier = 2;
+                itemsForAll = true;
+            }
+            default -> {
+                tier = 0;
+                itemsForAll = false;
+            }
+        }
+        boolean aceItem = state.battleKind != NodeType.TRAINER || state.badges >= 4;
+        Set<String> usedItems = new HashSet<>();
+        List<String> result = new ArrayList<>();
+        for (int i = 0; i < state.battleTeam.size(); i++) {
+            boolean ace = i == state.battleTeam.size() - 1;
+            boolean giveItem = itemsForAll || (aceItem && ace);
+            result.add(TeamBuilder.build(state.battleTeam.get(i), tier, doubles, giveItem, usedItems, random));
+        }
+        return result;
     }
 
     /**

@@ -36,7 +36,7 @@ public final class CobblemonBattles {
     }
 
     /**
-     * Starts a singles battle between the player's (rogue) party and an AI trainer.
+     * Starts a singles or doubles battle between the player's (rogue) party and an AI trainer.
      * A temporary Cobblemon NPC is spawned in front of the player to send the trainer's
      * Pokémon out, and it is despawned a few seconds after the battle ends.
      * The player's party is used directly, so damage, fainting and EXP carry over within the run.
@@ -46,7 +46,7 @@ public final class CobblemonBattles {
      * @return the battle, or null if it could not start
      */
     public static PokemonBattle startTrainerBattle(ServerPlayerEntity player, String trainerName,
-                                                   List<Pokemon> trainerTeam, int aiSkill) {
+                                                   List<Pokemon> trainerTeam, int aiSkill, boolean doubles) {
         List<BattlePokemon> playerTeam = new ArrayList<>(CobblemonBridge.party(player).toBattleTeam(false, false, null));
         playerTeam.sort(Comparator.comparing(pokemon -> pokemon.getHealth() <= 0));
         if (playerTeam.isEmpty() || playerTeam.get(0).getHealth() <= 0 || trainerTeam.isEmpty()) {
@@ -68,7 +68,7 @@ public final class CobblemonBattles {
         int skill = Math.max(0, Math.min(5, aiSkill));
         NPCBattleActor trainer = new NPCBattleActor(npc, team, skill, new StrongBattleAI(skill));
 
-        BattleFormat format = singlesWithBagClause();
+        BattleFormat format = withBagClause(doubles ? BattleFormat.Companion.getGEN_9_DOUBLES() : BattleFormat.Companion.getGEN_9_SINGLES());
 
         // canPreempt = false: run battles skip BATTLE_STARTED_PRE, so neither our own
         // outside-battle guard nor other mods (e.g. level-cap mods) can cancel them.
@@ -107,7 +107,8 @@ public final class CobblemonBattles {
         int skill = Math.max(0, Math.min(5, aiSkill));
         PokemonBattleActor wildActor = new PokemonBattleActor(wild.getUuid(), battlePokemon, 32.0F, new StrongBattleAI(skill));
 
-        BattleStartResult result = BattleRegistry.startBattle(singlesWithBagClause(), new BattleSide(playerActor), new BattleSide(wildActor), false);
+        BattleStartResult result = BattleRegistry.startBattle(withBagClause(BattleFormat.Companion.getGEN_9_SINGLES()),
+                new BattleSide(playerActor), new BattleSide(wildActor), false);
         if (!(result instanceof SuccessfulBattleStart success)) {
             RunEntities.despawn(entity);
             return null;
@@ -119,11 +120,10 @@ public final class CobblemonBattles {
         return battle;
     }
 
-    private static BattleFormat singlesWithBagClause() {
-        BattleFormat singles = BattleFormat.Companion.getGEN_9_SINGLES();
-        Set<String> rules = new HashSet<>(singles.getRuleSet());
+    private static BattleFormat withBagClause(BattleFormat base) {
+        Set<String> rules = new HashSet<>(base.getRuleSet());
         rules.add(BattleRules.BAG_CLAUSE);
-        return BattleFormat.Companion.setBattleRules(singles, rules);
+        return BattleFormat.Companion.setBattleRules(base, rules);
     }
 
     /** Force-stops the battle the player is in. Returns false if they aren't in one. */
