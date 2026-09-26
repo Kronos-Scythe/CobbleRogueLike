@@ -4,13 +4,23 @@ import org.CobbleUtils.cobbleroguelike.RogueConfig;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 /** Looks up and rolls rogue biomes (see {@link RogueConfig#biomes}). */
 public final class Biomes {
 
     private static final RogueConfig.RogueBiome FALLBACK = new RogueConfig.RogueBiome(
-            "wilds", "The Wilds", "minecraft:grass_block", List.of("#minecraft:is_overworld"), List.of("normal"));
+            "wilds", "The Wilds", "minecraft:grass_block", "minecraft:moss_block", List.of("#minecraft:is_overworld"), List.of("normal"));
+
+    /** Blocks for biomes from configs written before {@code block} existed. */
+    private static final Map<String, String> DEFAULT_BLOCKS = Map.ofEntries(
+            Map.entry("grasslands", "minecraft:moss_block"), Map.entry("forest", "minecraft:oak_log"),
+            Map.entry("jungle", "minecraft:jungle_log"), Map.entry("desert", "minecraft:sand"),
+            Map.entry("savanna", "minecraft:acacia_log"), Map.entry("mountains", "minecraft:stone"),
+            Map.entry("coast", "minecraft:prismarine"), Map.entry("swamp", "minecraft:mud"),
+            Map.entry("tundra", "minecraft:snow_block"), Map.entry("caves", "minecraft:deepslate"),
+            Map.entry("volcano", "minecraft:magma_block"), Map.entry("mystic", "minecraft:amethyst_block"));
 
     private Biomes() {
     }
@@ -23,6 +33,15 @@ public final class Biomes {
             }
         }
         return biomes.isEmpty() ? FALLBACK : biomes.get(0);
+    }
+
+    /** The block that themes a biome's screens and encounters. */
+    public static String block(String id) {
+        RogueConfig.RogueBiome biome = get(id);
+        if (biome.block != null && !biome.block.isBlank()) {
+            return biome.block;
+        }
+        return DEFAULT_BLOCKS.getOrDefault(biome.id, "minecraft:moss_block");
     }
 
     /** Picks a biome not used yet this run (all of them once every biome has been visited). */

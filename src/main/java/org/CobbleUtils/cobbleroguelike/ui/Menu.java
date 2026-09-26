@@ -13,14 +13,23 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import org.CobbleUtils.cobbleroguelike.RogueConfig;
+
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
- * A server-side chest menu. Items are just icons, and clicking a slot runs its action.
- * It uses the vanilla container screen, so it needs nothing on the client beyond Cobblemon.
+ * A server-side menu. Items are just icons, and clicking a slot runs its action.
+ * <p>Players with the mod installed see it in the run screen ({@link RogueView}, built by
+ * {@link RogueViews}); everyone else gets a vanilla chest screen, so the mod still works
+ * server-side only.
  */
 public final class Menu {
 
@@ -34,6 +43,28 @@ public final class Menu {
     }
 
     private final Map<Integer, ClickAction> actions = new HashMap<>();
+    /** Chest filler for empty slots. */
+    private String filler = "minecraft:gray_stained_glass_pane";
+    /** Run screen hints: the nav bar row, a themed backdrop, and slots only chests show. */
+    private int navRow = -1;
+    private String theme = "";
+    private boolean themedContent;
+    private final Set<Integer> chestOnly = new HashSet<>();
+
+    /** The menu each player currently has open in the run screen. */
+    private static final Map<UUID, OpenView> VIEWS = new ConcurrentHashMap<>();
+    private static int nextViewId = 1;
+
+    private static final class OpenView {
+        final int id;
+        final Menu menu;
+        boolean clicked;
+
+        OpenView(int id, Menu menu) {
+            this.id = id;
+            this.menu = menu;
+        }
+    }
 
     public Menu(Text title) {
         this(title, 3);
@@ -73,6 +104,51 @@ public final class Menu {
         return this;
     }
 
+    /** Chest filler item for empty slots (e.g. the biome's block on an encounter). */
+    public Menu filler(String itemId) {
+        this.filler = itemId;
+        return this;
+    }
+
+    /** Run screen: this row is the nav bar, shown as buttons along the bottom. */
+    public Menu navRow(int row) {
+        this.navRow = row;
+        return this;
+    }
+
+    /** Run screen: tile this block behind the run panels, and behind the content too if asked. */
+    public Menu theme(String blockId, boolean content) {
+        this.theme = blockId;
+        this.themedContent = content;
+        return this;
+    }
+
+    /** Run screen: hide this slot (it repeats something the run screen already shows). */
+    public Menu chestOnly(int slot) {
+        chestOnly.add(slot);
+        return this;
+    }
+
+    Text title() {
+        return title;
+    }
+
+    int navRowIndex() {
+        return navRow;
+    }
+
+    String themeBlock() {
+        return theme;
+    }
+
+    boolean themedContent() {
+        return themedContent;
+    }
+
+    boolean isChestOnly(int slot) {
+        return chestOnly.contains(slot);
+    }
+
     int rows() {
         return rows;
     }
@@ -86,7 +162,20 @@ public final class Menu {
     }
 
     public void open(ServerPlayerEntity player) {
-        ItemStack filler = stack("minecraft:gray_stained_glass_pane", Text.literal(" "), List.of());
+        if (RogueConfig.get().clientScreen && RogueNetwork.hasClientScreen(player)) {
+            if (player.currentScreenHandler != player.playerScreenHandler) {
+                player.closeHandledScreen();
+            }
+            int id;
+            synchronized (VIEWS) {
+                id = nextViewId++;
+            }
+            VIEWS.put(player.getUuid(), new OpenView(id, this));
+            ServerPlayNetworking.send(player, new RogueNetwork.OpenView(RogueViews.build(this, player, id)));
+            return;
+        }
+        VIEWS.remove(player.getUuid());
+        ItemStack filler = stack(this.filler, Text.literal(" "), List.of());
         for (int i = 0; i < inventory.size(); i++) {
             if (inventory.getStack(i).isEmpty()) {
                 inventory.setStack(i, filler.copy());
@@ -94,6 +183,43 @@ public final class Menu {
         }
         player.openHandledScreen(new SimpleNamedScreenHandlerFactory(
                 (syncId, playerInventory, p) -> new MenuScreenHandler(syncId, playerInventory, this), title));
+    }
+
+    /** A click from the run screen. Stale or repeated clicks are ignored. */
+    static void handleClick(ServerPlayerEntity player, int viewId, int slot, int button) {
+        OpenView open = VIEWS.get(player.getUuid());
+        if (open == null || open.id != viewId) {
+            return;
+        }
+        if (button == RogueNetwork.Click.CLOSED) {
+            VIEWS.remove(player.getUuid(), open);
+            return;
+        }
+        ClickAction action = open.menu.action(slot);
+        if (open.clicked || action == null) {
+            return;
+        }
+        open.clicked = true;
+        action.click(player, button == 1);
+        // Nothing new was opened (e.g. just a chat message): the same screen stays usable.
+        open.clicked = false;
+    }
+
+    /** Closes our menu, whichever way the player sees it. */
+    public static void close(ServerPlayerEntity player) {
+        if (VIEWS.remove(player.getUuid()) != null) {
+            ServerPlayNetworking.send(player, new RogueNetwork.CloseView());
+        }
+        player.closeHandledScreen();
+    }
+
+    /** True if the player has one of our menus open. */
+    public static boolean isOpen(ServerPlayerEntity player) {
+        return player.currentScreenHandler instanceof MenuScreenHandler || VIEWS.containsKey(player.getUuid());
+    }
+
+    public static void forget(UUID player) {
+        VIEWS.remove(player);
     }
 
     /** Builds an icon. {@code itemId} may name a Cobblemon item; unknown ids fall back to paper. */

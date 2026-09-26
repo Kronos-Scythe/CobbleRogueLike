@@ -32,7 +32,9 @@ The Gradle daemon runs on Java 25 (see `gradle/gradle-daemon-jvm.properties`). T
    - **Route:** pick one of 3 wild Pokémon from the current biome.
    - **Trainer:** fight an AI trainer (NPC) and earn coins.
    - **Rest stop:** full heal.
-   - **Legendary:** fight a legendary and it joins you if you win (after badges 2, 4 and 6, and rarely otherwise).
+   - **Legendary:** fight a legendary and it joins you if you win (after badges 3 and 6, rarely otherwise; co-op after badges 4 and 7).
+
+   The first 2 floors are routes only, so you can build a team before the first trainer.
 3. **Every 5th floor is a gym.** It has a random type, a double battle, a competitive team and a badge. Your run level cap rises with each badge.
    Before any boss (gym, Elite Four, Champion) you get free **Boss prep**, once each per boss and per player:
    - **Train to level cap:** one click, no grinding; moves and evolutions happen as usual.
@@ -42,7 +44,9 @@ The Gradle daemon runs on Java 25 (see `gradle/gradle-daemon-jvm.properties`). T
 5. **Losing or forfeiting ends the run.** Either way you earn **Rogue Tokens** to spend in the Rogue Shop.
 6. **Save & leave** any time between battles. Your real party comes back so you can play normally, and you can continue the run later from `/rogue`.
 
-Every run screen has a **nav bar** along the bottom row:
+With the mod installed on your client you get a **run screen** like Battle Tower's: your team (and your partner's in co-op) on the left, floor, badges, coins and a floor tower up to the next gym in the middle, and the options on the right, themed with the biome's blocks. Without it (server-only install) the same menus open as chests.
+
+Every run screen has a **nav bar** along the bottom:
 
 | Button | What it does |
 |---|---|
@@ -71,7 +75,8 @@ Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue sav
   - Each of you picks your own partner and keeps **up to 3 Pokémon**. Floors, badges and coins are shared.
   - **Every battle is a 2 vs 2** (Cobblemon's multi battle): you each control your own Pokémon against two trainers, or a legendary and its companion.
   - Battles start once you've **both pressed Ready** and are standing together.
-  - On routes, each of you takes a different Pokémon.
+  - On routes, each of you gets your own 3 options.
+  - Beat a legendary and one of you takes it, the other gets its companion.
   - Log off any time and the run waits for you. Losing ends the run for both of you.
 - **Mega Showdown (optional):**
   - Buy **gimmick unlocks** (Mega, Z-Moves, Tera, Dynamax) in the run shop, plus mega stones, Z-crystals and Tera shards. No real key items are handed out.
@@ -101,20 +106,23 @@ Outside a run, `/rogue` opens the start page: **Start a run** (or **Continue sav
 
 **Defaults are the hardest settings:**
 - every trainer uses the smartest AI (`maxTrainerAi`) with fully built sets (`setTierBonus: 2`)
-- team archetypes and boss Mega/Tera from the first gym
+- team archetypes and boss Mega/Tera
 - no free heal after gyms or Elite Four fights
+
+The start is gentler: difficulty ramps up to these settings over the first 2 gyms (`rampUntilBadge`), and Pokémon far below the level cap get extra EXP (`catchUpExp`).
 
 Run modifiers (Nuzlocke, Hard…) stay optional. To make the game easier, lower `setTierBonus`, turn off `maxTrainerAi`, or raise the `…FromBadge` options.
 
 
 - **Levels and pacing:** `starterLevel`, `resetStarterLevel`, `gymEvery`, `gymCount`, `levelCaps`, `gymTeamSizes`, `eliteCount`, `eliteEvery`
-- **Co-op:** `coopPartyLimit` (3), `coopMaxDistance`, `coopInviteSeconds`
-- **Balance:** `expMultiplier` (2× EXP for run Pokémon), `prepTrainToCap`, `prepDraft`, `prepHeal`, `prepDraftOptions`
+- **Co-op:** `coopPartyLimit` (3), `coopMaxDistance`, `coopInviteSeconds`, `coopLegendaryAfterBadges`, `coopLegendaryFromBadge`
+- **Balance:** `expMultiplier` (2× EXP for run Pokémon), `catchUpExp`, `rampUntilBadge`, `startRouteFloors`, `prepTrainToCap`, `prepDraft`, `prepHeal`, `prepDraftOptions`
 - **Difficulty:** `setTierBonus`, `maxTrainerAi`, `trainerArchetypesFromBadge`, `healAfterGym`, `healAfterElite`
 - **Battles:** `bossArchetypes`, `archetypeFromBadge`, `bossTeraFromBadge`, `bossMegaFromBadge`, `doubleBattles` (`bosses` / `all` / `none`), `doubleTrainerChance`, `bossGimmicks`
 - **Encounters:** `biomes` (Minecraft/Cobblemon biome ids and `#tags`, plus theme types), spawn bucket weights, `shinyChance`, `hiddenAbilityChance`, and the legendary settings
 - **Economy:** `startingMoney`, trainer rewards, the `shop` catalog, `moveTutorPrice`
 - **Rewards:** `tokensPerFloor`, `tokensPerBadge`, `championTokenBonus`, the `tokenShop` catalog, modifier bonuses
+- **UI:** `clientScreen` (use the run screen for players who have the mod), each biome's `block`
 - **Blocked commands** during runs: `blockedCommands`
 
 Unknown item ids are hidden from the shops, so catalog entries for missing mods are safe.

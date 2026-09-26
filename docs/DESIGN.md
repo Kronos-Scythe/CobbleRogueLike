@@ -35,14 +35,14 @@ A roguelike adventure mode for Cobblemon. It is modelled mostly on **Pokémon Em
 
 ## 3. The run loop (menu-driven, Battle Tower-style)
 
-The whole run is played through server-side chest menus (`/rogue`). There's no dimension, map or arenas, and the player stays wherever they are.
+The whole run is played through menus (`/rogue`): a Battle Tower-style run screen for players with the mod installed, or server-side chest menus for everyone else. There's no dimension, map or arenas, and the player stays wherever they are.
 
 ```
 /rogue ──► Start ──► pick your partner from your party/PC
                           │
       ┌───────────── each floor: choose 1 of 3 path cards ─────────────┐
       │  Route      : pick ONE of 3 wild Pokémon from the biome (or skip)│
-      │  Legendary  : after badges 2/4/6 (and rarely): beat it to recruit│
+      │  Legendary  : after badges 3/6 (co-op 4/7): beat it to recruit  │
       │  Rest stop  : full heal                                         │
       │  Trainer    : generated AI trainer battle                       │
       │  Shop & Bag : always available from every run menu              │
@@ -75,7 +75,8 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
   - Pools are cached and rebuilt on `/reload` or `/rogue admin reload`.
 - **Extras:** route and legendary Pokémon roll a shiny chance (1/256) and a hidden-ability chance (10%). Menus show form, shiny and hidden ability, with form-accurate model icons.
 - **Legendary encounters:**
-  - A Legendary card is guaranteed on the first floor after badges 2, 4 and 6, and has a 3% chance on other floors.
+  - A Legendary card is guaranteed on the first floor after badges 3 and 6 (`legendaryAfterBadges`), and has a 1% chance on other floors from 2 badges on (`legendaryChance`, `legendaryChanceFromBadge`).
+  - Co-op gets them later: after badges 4 and 7 (`coopLegendaryAfterBadges`), never before `coopLegendaryFromBadge` (4).
   - The legendary spawns in front of the player as an uncatchable, AI-less wild Pokémon at the level cap, and is fought as a real wild battle (`PokemonBattleActor`, `StrongBattleAI`).
   - Beating it recruits a rogue copy, going through the release screen if the party is full. Players can also walk away from the preview.
   - Tiers by badges: BST ≤ 600, then ≤ 680, then any. Box legendaries unlock at 6 badges. Ultra Beasts and paradoxes can be turned off in the config.
@@ -97,7 +98,12 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
 ### Balance: boss prep and EXP
 
 Hard bosses need a way to catch up, like Emerald Rogue's level-1 Chansey but without the grind.
-- **EXP:** run Pokémon get `expMultiplier` (2×) from battles, still clamped at the level cap.
+- **EXP:** run Pokémon get `expMultiplier` (2×) from battles, still clamped at the level cap. With `catchUpExp`, a Pokémon N levels under the cap gets another ×(1 + min(N, 10)/10), so new recruits catch up fast.
+- **Early ramp** (`rampUntilBadge`, 2): before that many badges the config difficulty is phased in (not on Hard):
+  - `setTierBonus` scales with badges (0 at the start, half after gym 1), no max AI (skill `1 + badges/2`, gyms `2 + badges/2`).
+  - Gym archetypes and boss Tera from gym 2, trainer archetypes and boss Mega from `rampUntilBadge`; the `…FromBadge` settings can only push these later.
+  - Co-op trainers field 2 Pokémon (one each) instead of 3+.
+- **Start routes:** the first `startRouteFloors` (2) floors turn trainer cards into routes (not in Solo), so you have a team before the first fight.
 - **Boss prep** on every gym, Elite Four and Champion preview, once each per boss and per player (co-op too), tracked in `prepUsed`:
   - **Train to level cap:** gives each run Pokémon exactly the EXP to reach the cap via `addExperienceWithPlayer`, so level-up moves, evolutions and the EXP screen behave normally.
   - **Draft a counter:** pick 1 of `prepDraftOptions` (3) Pokémon at the cap whose type hits the boss's type super effectively (`TypeChart`), or any strong Pokémon for the Champion. No legendaries. A full team uses the per-player release screen (`coopPending`, now used in solo too).
@@ -270,7 +276,7 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
   - One shared `RunState` holds floor, biome, badges, coins, bag, modifiers and battles. It's stored under the host's id, and the partner's run file is only a `link` to it.
   - Both players map to the same live object. On login the live instance is reused if the other player is online.
 - **Parties:** each player keeps their own run team, limited to `coopPartyLimit` (3). Level cap, EXP, Move Tutor, bag use and held items are all per player.
-- **Routes:** each player takes a different option or skips. The floor advances when both are done, or when the other player is offline. A full party gets its own release screen (`coopPending`).
+- **Routes:** each player gets their own roll of options (`coopOptions`), takes one or skips. The floor advances when both are done, or when the other player is offline. A full party gets its own release screen (`coopPending`).
 - **Battles:**
   - Always Cobblemon `MULTI` (2 actors per side, 1 active each): two `PlayerBattleActor`s against two NPC trainers spawned side by side. The generated team is split between them; the lead trainer keeps the ace and the gimmick.
   - Legendaries fight alongside a same-type companion Pokémon.
@@ -278,7 +284,8 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
 - **Results:**
   - A win or loss is shared (the whole side wins or loses), and the rewards are shared coins.
   - Nuzlocke releases fainted Pokémon for both players. The run ends if either player has none left.
-  - A legendary joins whichever player has room (host first); otherwise the host gets a release screen.
+  - A legendary win gives a claim screen (`coopClaim`): whoever clicks first takes the legendary or its companion, and the partner gets the other. Anyone with a full party gets a release screen, and a Pokémon given while offline is added on the next open if there's room.
+  - After the opening send-outs, each player is re-sent their ally's active Pokémon (`BattleSwitchPokemonPacket`), as players reported the ally tile missing from the battle overlay.
 - **Ending:**
   - Any end (loss, win, `/rogue end`, `/rogue endbattle`, `/rogue clean`) finishes the run for both, and each player gets their own token payout.
   - Offline players get their party back on their next login, because their link no longer resolves.
@@ -289,7 +296,10 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
 ## 7. Technical notes
 
 - **Target:** Cobblemon 1.6.x on MC 1.21.1, Fabric (yarn mappings). All Cobblemon API calls live in `compat/CobblemonBridge` and `compat/CobblemonGuards`, so an API change only needs fixing there.
-- **Menus:** vanilla `GenericContainerScreenHandler` subclasses (`ui/Menu`, `ui/MenuScreenHandler`). No client code is needed, and clicks never move items.
+- **Menus:** every screen is a `ui/Menu` (slots, icons, click actions), shown one of two ways:
+  - **Run screen** (client has the mod, `clientScreen: true`): `RogueViews` turns the menu plus the run into a `RogueView` (party with HP and held items, the partner's team in co-op, stats, a floor tower of the current segment with the gym on top, or the Elite Four and Champion), sent with `RogueNetwork.OpenView`. The client `RogueScreen` lists the menu's slots as rows (name, first lore line, full lore on hover) and the nav row (`Menu.navRow`) as bottom buttons. Clicks come back as `RogueNetwork.Click(viewId, slot, button)`; stale views are ignored. `Menu.close` / `Menu.isOpen` cover both kinds of screen.
+  - **Chest** (vanilla `GenericContainerScreenHandler` subclasses, `ui/MenuScreenHandler`): for clients without the mod. Clicks never move items.
+  - **Biome theme:** each biome has a `block` (sand, snow, magma...). The run screen tiles it behind the stats and, on encounters, behind the wild Pokémon; chest encounters use it as filler.
 - **Battles (next):** build trainer actors programmatically and start them through the battle registry. Mark them as sanctioned so the battle guard lets them through.
 - **Data-driven:** encounter pools live in `config/cobbleroguelike.json` for now, and move to datapack JSON with trainers, gyms and shops.
 

@@ -54,7 +54,12 @@ public final class CobblemonGuards {
                 event.cancel();
                 return;
             }
-            double multiplier = org.CobbleUtils.cobbleroguelike.RogueConfig.get().expMultiplier;
+            org.CobbleUtils.cobbleroguelike.RogueConfig config = org.CobbleUtils.cobbleroguelike.RogueConfig.get();
+            double multiplier = config.expMultiplier;
+            if (config.catchUpExp) {
+                // Catch-up: up to 2x more for Pokémon 10+ levels under the cap (new recruits, the early game).
+                multiplier *= 1 + Math.min(10, cap - pokemon.getLevel()) / 10.0;
+            }
             if (multiplier > 0 && multiplier != 1.0 && event.getSource() instanceof com.cobblemon.mod.common.api.pokemon.experience.BattleExperienceSource) {
                 event.setExperience((int) Math.round(event.getExperience() * multiplier));
             }
