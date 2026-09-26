@@ -1,0 +1,91 @@
+# CobbleRogueLike
+
+A roguelike mode for [Cobblemon](https://modrinth.com/mod/cobblemon), inspired by Pokémon Emerald Rogue and Cobblemon Battle Tower. You pick one of your own Pokémon as your only partner and battle through floors of trainers, gyms, the Elite Four and the Champion. Your real team, levels and gym progress are never touched.
+
+> **Status:** early development. Features are written but still being tested in game.
+
+## Requirements
+
+| | Version |
+|---|---|
+| Minecraft | 1.21.1 (Fabric) |
+| Fabric Loader | 0.19.5+ |
+| Fabric API | 0.116.17+1.21.1 |
+| Fabric Language Kotlin | 1.13.7+kotlin.2.2.21 |
+| Cobblemon | 1.8.1+1.21.1 |
+| Mega Showdown | *optional*: 1.1.3+1.8+1.21.1 |
+
+## Building
+
+```sh
+./gradlew build        # jar in build/libs/
+./gradlew runClient    # dev client
+./gradlew runServer    # dev server
+```
+
+The Gradle daemon runs on Java 25 (see `gradle/gradle-daemon-jvm.properties`). The mod itself targets Java 21.
+
+## How a run works
+
+1. **`/rogue` → Start a run.** Toggle optional **modifiers**, then pick a partner from your party or PC. A copy joins the run at level 5, and your real party is saved safely until the run ends.
+2. **Each floor, choose 1 of 3 path cards:**
+   - **Route:** pick one of 3 wild Pokémon from the current biome.
+   - **Trainer:** fight an AI trainer (NPC) and earn coins.
+   - **Rest stop:** full heal.
+   - **Legendary:** fight a legendary and it joins you if you win (after badges 2, 4 and 6, and rarely otherwise).
+3. **Every 5th floor is a gym.** It has a random type, a double battle, a competitive team and a badge. Your run level cap rises with each badge.
+4. **After 8 badges**, 4 Elite Four battles, then **the Champion**. Beat them to win.
+5. **Losing or forfeiting ends the run.** Either way you earn **Rogue Tokens** to spend in `/rogue shop`.
+
+Between battles, every run screen has:
+- **Shop:** coins for healing items, competitive held items, berries, mints, evolution items and more.
+- **Bag:** use items, give or take held items, and move items between Pokémon.
+- **Move Tutor:** level-up moves are free; TM, tutor and egg moves cost coins.
+
+### Features
+
+- **Isolation:** only your party is swapped for the run, and it's written to disk first. Run Pokémon are tagged, and anything leaked is cleaned up. The PC, `/pc`, `/trade`, catching, outside battles and held-item swaps are blocked during a run.
+- **Biomes:** 12 biomes (Volcano, Tundra, Caves…), each built from **Cobblemon's real spawn data**, so regional forms and addon species appear. Shiny (1/256) and hidden-ability (10%) chances.
+- **Battles:** real Cobblemon NPC trainers with `StrongBattleAI`. Gyms, the Elite Four and the Champion are **double battles** with competitive sets: chosen moves, support moves such as Protect or Fake Out, held items, natures, IVs and EVs.
+- **Modifiers:** Nuzlocke, Solo, Hard, No Shop and All Doubles, each with a token bonus.
+- **Mega Showdown (optional):**
+  - Buy **gimmick unlocks** (Mega, Z-Moves, Tera, Dynamax) in the run shop, plus mega stones, Z-crystals and Tera shards. No real key items are handed out.
+  - **Bosses Mega Evolve or Terastallize.**
+
+## Commands
+
+| Command | Who | What |
+|---|---|---|
+| `/rogue` | everyone | Open the run menu (or the hub) |
+| `/rogue shop` | everyone | Spend Rogue Tokens on real items |
+| `/rogue tutor` | in a run | Move Tutor |
+| `/rogue end` | in a run | End your run (tokens still paid) |
+| `/rogue endbattle` | in a run | Force-stop a stuck battle **and end the run** |
+| `/rogue clean` | everyone | Clean up leftover run data and restore your party |
+| `/rogue admin end\|endbattle\|clean <player>` | op | Same as above, for another player |
+| `/rogue admin tokens <player> <amount>` | op | Add or remove Rogue Tokens |
+| `/rogue admin reload` | op | Reload the config and biome spawn pools |
+
+## Configuration
+
+`config/cobbleroguelike.json` is created on first launch. Highlights:
+
+- **Levels and pacing:** `starterLevel`, `resetStarterLevel`, `gymEvery`, `gymCount`, `levelCaps`, `gymTeamSizes`, `eliteCount`, `eliteEvery`
+- **Battles:** `doubleBattles` (`bosses` / `all` / `none`), `doubleTrainerChance`, `bossGimmicks`
+- **Encounters:** `biomes` (Minecraft/Cobblemon biome ids and `#tags`, plus theme types), spawn bucket weights, `shinyChance`, `hiddenAbilityChance`, and the legendary settings
+- **Economy:** `startingMoney`, trainer rewards, the `shop` catalog, `moveTutorPrice`
+- **Rewards:** `tokensPerFloor`, `tokensPerBadge`, `championTokenBonus`, the `tokenShop` catalog, modifier bonuses
+- **Blocked commands** during runs: `blockedCommands`
+
+Unknown item ids are hidden from the shops, so catalog entries for missing mods are safe.
+
+## Data
+
+Stored per world in `<world>/cobbleroguelike/`:
+- `journals/`: saved real parties
+- `runs/`: run progress
+- `profiles/`: Rogue Tokens and stats
+
+## More
+
+- [Design notes](docs/DESIGN.md)
