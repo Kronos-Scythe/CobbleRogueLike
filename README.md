@@ -44,7 +44,7 @@ The Gradle daemon runs on Java 25 (see `gradle/gradle-daemon-jvm.properties`). T
 5. **Losing or forfeiting ends the run.** Either way you earn **Rogue Tokens** to spend in the Rogue Shop.
 6. **Save & leave** any time between battles. Your real party comes back so you can play normally, and you can continue the run later from `/rogue`.
 
-With the mod installed on your client you get a **run screen** like Battle Tower's: your team (and your partner's in co-op) on the left, the options in the middle as cards, a grid or a list, and your progress (floor, badges and a floor tower up to the next gym) on the right, themed with the biome's blocks. It comes back by itself after every run battle. Coins sit in the top-right corner, **Close** in the bottom-left and **Back** (when there's somewhere to go back to) in the bottom-right. Without the mod on the client (server-only install) the same menus open as chests.
+With the mod installed on your client you get a **run screen** like Battle Tower's: your team (and your partner's in co-op) on the left, the options in the middle as cards, a grid or a list, and your progress (floor, badges and a floor tower up to the next gym) on the right, themed with the biome's blocks. It comes back by itself after every run battle. It scales to fit your window at any GUI scale. Coins sit in the top-right corner, **Close** in the bottom-left and **Back** (when there's somewhere to go back to) in the bottom-right. Without the mod on the client (server-only install) the same menus open as chests.
 
 Every run screen has a **nav bar** along the bottom:
 
