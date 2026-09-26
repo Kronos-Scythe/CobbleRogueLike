@@ -11,9 +11,13 @@ import com.cobblemon.mod.common.battles.SuccessfulBattleStart;
 import com.cobblemon.mod.common.battles.actor.PlayerBattleActor;
 import com.cobblemon.mod.common.battles.ai.StrongBattleAI;
 import com.cobblemon.mod.common.battles.pokemon.BattlePokemon;
+import com.cobblemon.mod.common.entity.npc.NPCBattleActor;
+import com.cobblemon.mod.common.entity.npc.NPCEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import kotlin.Unit;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
+import org.CobbleUtils.cobbleroguelike.util.Scheduler;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -31,6 +35,8 @@ public final class CobblemonBattles {
 
     /**
      * Starts a singles battle between the player's (rogue) party and an AI trainer.
+     * A temporary Cobblemon NPC is spawned in front of the player to send the trainer's
+     * Pokémon out, and it is despawned a few seconds after the battle ends.
      * The player's party is used directly, so damage, fainting and EXP carry over within the run.
      * The trainer's Pokémon are battle clones and can't be caught. The Bag Clause stops
      * real-inventory items from being used.
@@ -47,10 +53,18 @@ public final class CobblemonBattles {
         PlayerBattleActor playerActor = new PlayerBattleActor(player.getUuid(), playerTeam);
 
         List<BattlePokemon> team = new ArrayList<>();
+        int topLevel = 1;
         for (Pokemon pokemon : trainerTeam) {
             team.add(BattlePokemon.Companion.safeCopyOf(pokemon));
+            topLevel = Math.max(topLevel, pokemon.getLevel());
         }
-        RogueTrainerActor trainer = new RogueTrainerActor(trainerName, UUID.randomUUID(), team, new StrongBattleAI(aiSkill));
+
+        NPCEntity npc = TrainerNpcs.spawn(player, trainerName, topLevel);
+        if (npc == null) {
+            return null;
+        }
+        int skill = Math.max(0, Math.min(5, aiSkill));
+        NPCBattleActor trainer = new NPCBattleActor(npc, team, skill, new StrongBattleAI(skill));
 
         BattleFormat singles = BattleFormat.Companion.getGEN_9_SINGLES();
         Set<String> rules = new HashSet<>(singles.getRuleSet());
@@ -60,7 +74,26 @@ public final class CobblemonBattles {
         // canPreempt = false: run battles skip BATTLE_STARTED_PRE, so neither our own
         // outside-battle guard nor other mods (e.g. level-cap mods) can cancel them.
         BattleStartResult result = BattleRegistry.startBattle(format, new BattleSide(playerActor), new BattleSide(trainer), false);
-        return result instanceof SuccessfulBattleStart success ? success.getBattle() : null;
+        if (!(result instanceof SuccessfulBattleStart success)) {
+            TrainerNpcs.despawn(npc);
+            return null;
+        }
+        PokemonBattle battle = success.getBattle();
+        MinecraftServer server = player.getServer();
+        onEnd(battle, ended -> server.execute(() ->
+                // Give the NPC time to recall its Pokémon before it disappears.
+                Scheduler.runLater(60, () -> TrainerNpcs.despawn(npc))));
+        return battle;
+    }
+
+    /** Force-stops the battle the player is in. Returns false if they aren't in one. */
+    public static boolean stopBattle(ServerPlayerEntity player) {
+        PokemonBattle battle = BattleRegistry.getBattleByParticipatingPlayer(player);
+        if (battle == null) {
+            return false;
+        }
+        battle.stop();
+        return true;
     }
 
     public static void onEnd(PokemonBattle battle, Consumer<PokemonBattle> handler) {

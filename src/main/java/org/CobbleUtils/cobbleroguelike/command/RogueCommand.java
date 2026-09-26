@@ -12,9 +12,10 @@ import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
 
 /**
- * {@code /rogue} opens the menu. {@code /rogue end} ends the run. {@code /rogue clean} force-cleans
- * leftover run data and gives back the saved party.
- * Admin: {@code /rogue admin end <player>}, {@code /rogue admin clean <player>}, {@code /rogue admin reload}.
+ * {@code /rogue} opens the menu. {@code /rogue end} ends the run. {@code /rogue endbattle} force-stops
+ * the current battle and ends the run. {@code /rogue clean} force-cleans leftover run data and gives
+ * back the saved party.
+ * Admin: {@code /rogue admin end|endbattle|clean <player>}, {@code /rogue admin reload}.
  */
 public final class RogueCommand {
 
@@ -36,6 +37,15 @@ public final class RogueCommand {
                     RunManager.get().end(player, "You ended your run.");
                     return 1;
                 }))
+                .then(literal("endbattle").executes(ctx -> {
+                    ServerPlayerEntity player = ctx.getSource().getPlayerOrThrow();
+                    if (!RunManager.isInRun(player) && !ctx.getSource().hasPermissionLevel(2)) {
+                        ctx.getSource().sendError(Text.literal("You can only end battles during a rogue run."));
+                        return 0;
+                    }
+                    RunManager.get().endBattle(player);
+                    return 1;
+                }))
                 .then(literal("clean").executes(ctx -> {
                     RunManager.get().clean(ctx.getSource().getPlayerOrThrow());
                     return 1;
@@ -46,6 +56,12 @@ public final class RogueCommand {
                             ServerPlayerEntity target = EntityArgumentType.getPlayer(ctx, "player");
                             RunManager.get().end(target, "An admin ended your run.");
                             ctx.getSource().sendFeedback(() -> Text.literal("Ended rogue run for " + target.getName().getString()), true);
+                            return 1;
+                        })))
+                        .then(literal("endbattle").then(argument("player", EntityArgumentType.player()).executes(ctx -> {
+                            ServerPlayerEntity target = EntityArgumentType.getPlayer(ctx, "player");
+                            RunManager.get().endBattle(target);
+                            ctx.getSource().sendFeedback(() -> Text.literal("Ending battle and rogue run for " + target.getName().getString()), true);
                             return 1;
                         })))
                         .then(literal("clean").then(argument("player", EntityArgumentType.player()).executes(ctx -> {

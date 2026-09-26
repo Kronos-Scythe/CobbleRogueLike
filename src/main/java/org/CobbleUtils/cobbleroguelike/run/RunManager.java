@@ -17,6 +17,7 @@ import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
 import org.CobbleUtils.cobbleroguelike.run.RunState.NodeType;
 import org.CobbleUtils.cobbleroguelike.run.RunState.Phase;
 import org.CobbleUtils.cobbleroguelike.ui.RogueMenus;
+import org.CobbleUtils.cobbleroguelike.util.Scheduler;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -48,6 +49,8 @@ public final class RunManager {
     private final MinecraftServer server;
     private final RunStorage storage;
     private final Map<UUID, RunState> active = new HashMap<>();
+    /** Players whose battle is being force-stopped by /rogue endbattle; their run ends right after. */
+    private final Set<UUID> endingByCommand = new HashSet<>();
 
     private RunManager(MinecraftServer server) {
         this.server = server;
@@ -367,7 +370,7 @@ public final class RunManager {
             return;
         }
         if (CobblemonBridge.isInBattle(player)) {
-            message(player, "Finish your battle first.", Formatting.RED);
+            message(player, "Finish your battle first. Stuck? Use /rogue endbattle (this ends your run).", Formatting.RED);
             return;
         }
         switch (state.phase) {
@@ -435,6 +438,9 @@ public final class RunManager {
      * can be challenged again, and damage taken so far carries over. A loss or forfeit ends the run.
      */
     private void onBattleEnded(UUID playerId, Boolean won) {
+        if (endingByCommand.contains(playerId)) {
+            return;
+        }
         ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
         RunState state = active.get(playerId);
         if (player == null || state == null || state.phase != Phase.BATTLE) {
@@ -469,6 +475,38 @@ public final class RunManager {
         advanceFloor(state);
         save(player, state);
         openCurrent(player);
+    }
+
+    /**
+     * Force-stops the player's current battle and ends their run. Players can only use this on
+     * themselves while in a run, so it can't be used to escape PvP battles. Ops can use it on anyone.
+     */
+    public void endBattle(ServerPlayerEntity player) {
+        UUID id = player.getUuid();
+        boolean hadBattle;
+        endingByCommand.add(id);
+        try {
+            hadBattle = CobblemonBattles.stopBattle(player);
+        } catch (RuntimeException e) {
+            Cobbleroguelike.LOGGER.error("Failed to stop battle for {}", player.getName().getString(), e);
+            hadBattle = true;
+        }
+        // The battle closes during stop(); finish on a later tick once it's fully torn down.
+        Scheduler.runLater(5, () -> {
+            endingByCommand.remove(id);
+            if (CobblemonBridge.isInBattle(player)) {
+                message(player, "Couldn't stop the battle. Try relogging, then /rogue clean.", Formatting.RED);
+                return;
+            }
+            if (active.containsKey(id) || storage.hasJournal(id)) {
+                finish(player, "You ended the battle and your run.");
+            } else {
+                message(player, "Battle ended.", Formatting.GOLD);
+            }
+        });
+        if (!hadBattle) {
+            message(player, "You're not in a battle; ending your run.", Formatting.YELLOW);
+        }
     }
 
     /** Current run level cap for a player, or -1 if they aren't in a run. */

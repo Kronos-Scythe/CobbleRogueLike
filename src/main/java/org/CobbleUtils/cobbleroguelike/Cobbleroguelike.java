@@ -5,8 +5,10 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import org.CobbleUtils.cobbleroguelike.command.RogueCommand;
+import org.CobbleUtils.cobbleroguelike.compat.TrainerNpcs;
 import org.CobbleUtils.cobbleroguelike.guard.RogueGuards;
 import org.CobbleUtils.cobbleroguelike.run.RunManager;
+import org.CobbleUtils.cobbleroguelike.util.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,5 +29,7 @@ public class Cobbleroguelike implements ModInitializer {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> RogueCommand.register(dispatcher));
 
         RogueGuards.register();
+        TrainerNpcs.register();
+        Scheduler.register();
     }
 }
