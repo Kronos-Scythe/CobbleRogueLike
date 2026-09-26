@@ -3,7 +3,7 @@
   "id": "cobbleroguelike",
   "version": "${version}",
   "name": "CobbleRogueLike",
-  "description": "",
+  "description": "An Emerald Rogue-inspired roguelike mode for Cobblemon, isolated from your main save.",
   "authors": [],
   "contact": {},
   "license": "All-Rights-Reserved",
@@ -30,6 +30,11 @@
   "depends": {
     "fabricloader": ">=${loader_version}",
     "fabric-api": "*",
-    "minecraft": "${minecraft_version}"
+    "minecraft": "${minecraft_version}",
+    "fabric-language-kotlin": "*",
+    "cobblemon": ">=1.8.0"
+  },
+  "suggests": {
+    "mega_showdown": "*"
   }
 }

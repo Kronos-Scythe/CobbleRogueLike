@@ -1,0 +1,28 @@
+{
+  "resourceIdentifier": "cobblemon:standard",
+  "hitbox": "player",
+  "variation": {
+    "dirt": [
+      "clean",
+      "slightly_dirty"
+    ],
+    "net": {
+      "type": "weighted",
+      "options": [
+        { "aspect": "green", "weight": 10 },
+        { "aspect": "blue", "weight": 5 },
+        { "aspect": "red", "weight": 1 }
+      ]
+    }
+  },
+  "battleConfiguration": {
+    "canChallenge": false
+  },
+  "autoHealParty": false,
+  "skill": 3,
+  "canDespawn": false,
+  "isMovable": false,
+  "isInvulnerable": true,
+  "isLeashable": false,
+  "allowProjectileHits": false
+}
