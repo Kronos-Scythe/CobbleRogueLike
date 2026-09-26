@@ -1,6 +1,7 @@
 package org.CobbleUtils.cobbleroguelike.run;
 
 import org.CobbleUtils.cobbleroguelike.RogueConfig;
+import org.CobbleUtils.cobbleroguelike.compat.ArchetypeBuilder;
 import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
 import org.CobbleUtils.cobbleroguelike.compat.MegaData;
 import org.CobbleUtils.cobbleroguelike.shop.ShopCatalog;
@@ -34,7 +35,7 @@ public final class TrainerGenerator {
         state.battleKind = kind;
         String name = NAMES[random.nextInt(NAMES.length)];
         boolean boss = kind == NodeType.GYM || kind == NodeType.ELITE || kind == NodeType.CHAMPION;
-        boolean doubles = Modifiers.has(state, Modifiers.ALL_DOUBLES) || switch (config.doubleBattles.toLowerCase(Locale.ROOT)) {
+        boolean doubles = state.isCoop() || Modifiers.has(state, Modifiers.ALL_DOUBLES) || switch (config.doubleBattles.toLowerCase(Locale.ROOT)) {
             case "all" -> true;
             case "none" -> false;
             default -> boss || random.nextDouble() < config.doubleTrainerChance;
@@ -67,14 +68,16 @@ public final class TrainerGenerator {
                 if (!prepareLegendary(state, random)) {
                     // Nothing eligible (e.g. legendaries disabled by datapack): fall back to a trainer.
                     prepare(state, NodeType.TRAINER, random);
+                } else if (state.isCoop()) {
+                    addLegendaryCompanion(state, random);
                 }
-                return; // legendary encounters are always singles and use their natural set
+                return; // legendary encounters use their natural set
             }
             default -> {
                 int level = Scaling.trainerLevel(state) + hardBonus;
                 int size = Math.min(6, 1 + state.badges / 2 + random.nextInt(2));
                 if (doubles) {
-                    size = Math.max(2, size);
+                    size = Math.max(state.isCoop() ? 3 : 2, size);
                 }
                 state.battleName = TRAINER_CLASSES[random.nextInt(TRAINER_CLASSES.length)] + " " + name;
                 state.battleSkill = Math.min(5, 1 + state.badges / 2);
@@ -85,9 +88,50 @@ public final class TrainerGenerator {
                         : buildTeam(null, size, level, false, false, random);
             }
         }
+        if (config.maxTrainerAi || Modifiers.has(state, Modifiers.HARD)) {
+            state.battleSkill = 5; // the smartest AI for everyone
+        }
         state.battleDoubles = doubles && state.battleTeam.size() >= 2;
-        state.battleTeam = strengthen(state, state.battleDoubles, random);
+        if (!tryArchetype(state, kind, doubles, random)) {
+            state.battleTeam = strengthen(state, state.battleDoubles, random);
+        }
         applyGimmick(state, random);
+        if (state.isCoop()) {
+            splitForCoop(state, random);
+        }
+    }
+
+    /**
+     * Co-op battles are 2 vs 2 (MULTI): the team is split between the main trainer, who keeps the
+     * ace and the gimmick, and a partner trainer.
+     */
+    private static void splitForCoop(RunState state, Random random) {
+        List<String> team = new ArrayList<>(state.battleTeam);
+        if (team.size() < 2) {
+            team.add(0, team.get(0)); // never happens with coop sizes, but keep both sides valid
+        }
+        int partnerSize = team.size() / 2;
+        state.battleTeam2 = new ArrayList<>(team.subList(0, partnerSize));
+        state.battleTeam = new ArrayList<>(team.subList(partnerSize, team.size()));
+        String name = NAMES[random.nextInt(NAMES.length)];
+        boolean boss = state.battleKind == NodeType.GYM || state.battleKind == NodeType.ELITE
+                || state.battleKind == NodeType.CHAMPION;
+        state.battleName2 = boss ? "Ace Trainer " + name : TRAINER_CLASSES[random.nextInt(TRAINER_CLASSES.length)] + " " + name;
+    }
+
+    /** Co-op legendary fights have a second wild Pokémon of the legendary's type at its side. */
+    private static void addLegendaryCompanion(RunState state, Random random) {
+        String legendary = state.battleTeam.get(0);
+        int level = Math.max(2, levelOf(legendary) - 2);
+        String type = CobblemonBridge.primaryType(speciesOf(legendary));
+        List<String> pool = CobblemonBridge.speciesPool(type, Scaling.minBst(level), Scaling.maxBst(level), false);
+        if (pool.isEmpty()) {
+            pool = CobblemonBridge.speciesPool(null, Scaling.minBst(level), Scaling.maxBst(level), false);
+        }
+        pool.sort(String::compareTo);
+        String companion = pool.isEmpty() ? "eevee" : pool.get(random.nextInt(pool.size()));
+        state.battleTeam2 = new ArrayList<>(List.of(companion + " level=" + level));
+        state.battleName2 = "Wild " + capitalize(companion.contains(":") ? companion.substring(companion.indexOf(':') + 1) : companion);
     }
 
     /**
@@ -108,8 +152,10 @@ public final class TrainerGenerator {
 
         if (lateBoss || state.badges >= config.bossMegaFromBadge) {
             Map<String, List<String>> stones = MegaData.stonesBySpecies();
-            // Prefer a team member that can already Mega Evolve; make it the ace.
-            for (int i = aceIndex; i >= 0 && !stones.isEmpty(); i--) {
+            // Prefer a team member that can already Mega Evolve; make it the ace. An archetype's
+            // setter (slot 0) stays in the lead.
+            int lowest = state.battleArchetype.isEmpty() ? 0 : 1;
+            for (int i = aceIndex; i >= lowest && !stones.isEmpty(); i--) {
                 String species = speciesOf(state.battleTeam.get(i));
                 if (stones.containsKey(species)) {
                     String member = state.battleTeam.remove(i);
@@ -186,6 +232,62 @@ public final class TrainerGenerator {
     }
 
     /**
+     * Replaces the prepared team with an archetype team (weather, Trick Room, Tailwind, terrain),
+     * built from a level-appropriate pool of the right type. Used by gyms from
+     * {@code archetypeFromBadge}, the Elite Four and the Champion, and on Hard by normal trainers with
+     * 3+ Pokémon. Returns false (keeping the plain team) if no archetype fits.
+     */
+    private static boolean tryArchetype(RunState state, NodeType kind, boolean doubles, Random random) {
+        RogueConfig config = RogueConfig.get();
+        if (!config.bossArchetypes) {
+            return false;
+        }
+        boolean hard = Modifiers.has(state, Modifiers.HARD);
+        boolean eligible = switch (kind) {
+            case GYM -> state.badges >= config.archetypeFromBadge || hard;
+            case ELITE, CHAMPION -> true;
+            case TRAINER -> state.battleTeam.size() >= 3 && (hard
+                    || (config.trainerArchetypesFromBadge >= 0 && state.badges >= config.trainerArchetypesFromBadge));
+            default -> false;
+        };
+        if (!eligible || state.battleTeam.isEmpty()) {
+            return false;
+        }
+        int size = state.battleTeam.size();
+        int level = levelOfTeam(state.battleTeam);
+        String type = state.battleType.isEmpty() ? null : state.battleType;
+        int tier = switch (kind) {
+            case GYM -> state.badges == 0 ? 0 : state.badges < 4 ? 1 : 2;
+            case ELITE, CHAMPION -> 2;
+            default -> 1;
+        };
+        tier = Math.min(2, tier + Math.max(0, config.setTierBonus) + (hard ? 1 : 0));
+        List<String> pool = kind == NodeType.TRAINER
+                ? Encounters.trainerPool(state, level)
+                : CobblemonBridge.speciesPool(type, Scaling.minBst(level), Scaling.maxBst(level), false);
+        if (pool.size() < size * 2 && kind != NodeType.TRAINER) {
+            pool = CobblemonBridge.speciesPool(type, 0, Scaling.maxBst(level) + 100, false);
+        }
+        pool.sort(String::compareTo);
+        ArchetypeBuilder.Result result = ArchetypeBuilder.build(pool, size, level,
+                ArchetypeBuilder.preferredFor(type, random), doubles, tier, random);
+        if (result == null) {
+            return false;
+        }
+        state.battleTeam = new ArrayList<>(result.team());
+        state.battleArchetype = result.archetype();
+        return true;
+    }
+
+    private static int levelOfTeam(List<String> team) {
+        int level = 1;
+        for (String member : team) {
+            level = Math.max(level, levelOf(member));
+        }
+        return level;
+    }
+
+    /**
      * Upgrades the prepared team into competitive sets (see {@link TeamBuilder}).
      * <ul>
      *     <li>Gyms: tier 0 at the first gym, tier 1 until 4 badges, then tier 2. Everyone holds
@@ -213,11 +315,10 @@ public final class TrainerGenerator {
             }
         }
         boolean hard = Modifiers.has(state, Modifiers.HARD);
-        if (hard) {
-            tier = Math.min(2, tier + 1);
-            itemsForAll = itemsForAll || state.badges >= 4;
-        }
-        boolean aceItem = state.battleKind != NodeType.TRAINER || state.badges >= 4 || hard;
+        int bonus = Math.max(0, RogueConfig.get().setTierBonus) + (hard ? 1 : 0);
+        tier = Math.min(2, tier + bonus);
+        itemsForAll = itemsForAll || tier >= 1;
+        boolean aceItem = state.battleKind != NodeType.TRAINER || state.badges >= 4 || bonus > 0;
         Set<String> usedItems = new HashSet<>();
         List<String> result = new ArrayList<>();
         for (int i = 0; i < state.battleTeam.size(); i++) {

@@ -20,7 +20,7 @@ public final class Modifiers {
     public static final List<Info> ALL = List.of(
             new Info(NUZLOCKE, "Nuzlocke", "minecraft:skeleton_skull", "Pokémon that faint are gone for good."),
             new Info(SOLO, "Solo", "minecraft:totem_of_undying", "Only your partner: routes give no Pokémon, and legendaries pay coins instead of joining."),
-            new Info(HARD, "Hard", "minecraft:netherite_sword", "Enemies are 2 levels higher and better equipped."),
+            new Info(HARD, "Hard", "minecraft:netherite_sword", "Every trainer is 2 levels higher (on top of the config difficulty)."),
             new Info(NO_SHOP, "No Shop", "minecraft:barrier", "The run shop is closed."),
             new Info(ALL_DOUBLES, "All Doubles", "minecraft:iron_sword", "Every trainer battle is a double battle."));
 

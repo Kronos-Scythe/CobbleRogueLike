@@ -47,8 +47,13 @@ public final class RunEntities {
 
     /** Spawns a trainer a few blocks in front of the player, facing them. Returns null on failure. */
     public static NPCEntity spawn(ServerPlayerEntity player, String name, int level) {
+        return spawn(player, name, level, 0.0);
+    }
+
+    /** {@code sideOffset} shifts the spot sideways (for the second trainer of a co-op battle). */
+    public static NPCEntity spawn(ServerPlayerEntity player, String name, int level, double sideOffset) {
         ServerWorld world = player.getServerWorld();
-        Vec3d pos = findSpot(world, player);
+        Vec3d pos = offset(findSpot(world, player), player, sideOffset);
 
         NPCEntity npc = new NPCEntity(world);
         npc.setNpc(npcClass());
@@ -72,8 +77,12 @@ public final class RunEntities {
 
     /** Spawns an uncatchable, AI-less wild Pokémon in front of the player. Returns null on failure. */
     public static PokemonEntity spawnWild(ServerPlayerEntity player, String properties) {
+        return spawnWild(player, properties, 0.0);
+    }
+
+    public static PokemonEntity spawnWild(ServerPlayerEntity player, String properties, double sideOffset) {
         ServerWorld world = player.getServerWorld();
-        Vec3d pos = findSpot(world, player);
+        Vec3d pos = offset(findSpot(world, player), player, sideOffset);
         PokemonEntity entity = PokemonProperties.Companion.parse(properties + " uncatchable no_ai").createEntity(world);
         float yaw = (float) (MathHelper.atan2(player.getZ() - pos.z, player.getX() - pos.x) * (180.0 / Math.PI)) - 90.0F;
         entity.refreshPositionAndAngles(pos.x, pos.y, pos.z, yaw, 0.0F);
@@ -95,6 +104,17 @@ public final class RunEntities {
         if (!entity.isRemoved()) {
             entity.discard();
         }
+    }
+
+    /** Moves a spot sideways relative to where the player is looking. */
+    private static Vec3d offset(Vec3d pos, ServerPlayerEntity player, double side) {
+        if (side == 0.0) {
+            return pos;
+        }
+        Vec3d look = player.getRotationVector();
+        Vec3d right = new Vec3d(-look.z, 0, look.x);
+        right = right.lengthSquared() < 1.0E-4 ? new Vec3d(1, 0, 0) : right.normalize();
+        return pos.add(right.multiply(side));
     }
 
     private static NPCClass npcClass() {

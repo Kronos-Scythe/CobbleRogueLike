@@ -94,6 +94,37 @@ Whiteout / win / "End run" ─► rewards ─► real party restored
   - Gym 5 and later, and the Champion: adds full EV spreads.
   - Normal trainers get the best level-up movesets, and their ace holds an item from 4 badges on.
 
+### Boss archetypes (hard, planned teams)
+
+Inspired by Radical Red, Run & Bun and the Kaizo hacks. Boss teams (gyms from `archetypeFromBadge`, the Elite Four, the Champion, and normal trainers with 3+ Pokémon from `trainerArchetypesFromBadge` or on Hard) are built by `ArchetypeBuilder` around one plan:
+
+| Archetype | Setter (ability, else move + item) | Abusers / bonuses |
+|---|---|---|
+| Rain | Drizzle / Rain Dance + Damp Rock | Swift Swim, Rain Dish, Dry Skin, Hydration; water ×1.5, Thunder and Hurricane boosted |
+| Sun | Drought / Sunny Day + Heat Rock | Chlorophyll, Solar Power, Protosynthesis…; fire ×1.5, Solar Beam allowed |
+| Sandstorm | Sand Stream / Sandstorm + Smooth Rock | Sand Rush, Sand Force; rock, ground and steel boosted |
+| Snow | Snow Warning / Snowscape + Icy Rock | Slush Rush, Ice Body; ice ×1.5, Blizzard and Aurora Veil |
+| Trick Room | Trick Room (slow, bulky, Mental Herb) | slow hard hitters, 0 Speed IVs, Brave/Quiet natures |
+| Tailwind | Tailwind (+ Focus Sash) | fast attackers |
+| Electric / Psychic / Grassy Terrain | Surge abilities / terrain move + Terrain Extender | Surge Surfer, Quark Drive, Expanding Force, Grassy Glide |
+
+- **Roles:** found by **ability and learnset** from the level-appropriate species pool (gym type, BST window), not from hard-coded species. So it works at every level and with addon Pokémon.
+  - Order: setter first (Protect in doubles), then a support (Fake Out, Follow Me or Rage Powder, Helping Hand, Intimidate; Protect; Sitrus Berry), then abusers sorted so the strongest is the ace, last.
+  - Abilities are forced via `ability=`. If a type can't fill an archetype, the next preferred one is tried, falling back to a plain competitive team.
+- **Types to archetypes:**
+  - Water: Rain, else Trick Room. Fire: Sun, else Tailwind.
+  - Rock, ground, steel: Sandstorm, else Trick Room. Ice: Snow.
+  - Electric: Electric Terrain, else Rain. Psychic: Psychic Terrain, else Trick Room.
+  - Ghost, fairy: Trick Room. Flying: Tailwind.
+  - The Elite Four and the Champion pick from all archetypes. There's a 30% chance of swapping the first two choices.
+- **All teams in doubles:** spread moves (`allAdjacent`, `allAdjacentFoes` targets) score ×1.25, and support moves include Icy Wind, Electroweb, Tailwind and Wide Guard for speed control.
+- **Difficulty defaults are the hardest** (config, not modifiers):
+  - `setTierBonus: 2`: every trainer gets tier-2 sets, with items, natures, perfect IVs and EVs.
+  - `maxTrainerAi`: AI skill 5 for everyone.
+  - `trainerArchetypesFromBadge: 0`, `archetypeFromBadge: 0`, `bossTeraFromBadge: 0` and `bossMegaFromBadge: 0`.
+  - `healAfterGym: false` and `healAfterElite: false`.
+- **Hard modifier:** adds +2 levels to every trainer on top, still gives max AI and archetypes regardless of config, and adds one set tier when the config is lowered.
+
 ### Elite Four and boss gimmicks
 
 - **Elite Four:** after the last badge, a boss floor comes every `eliteEvery` (2) floors: `eliteCount` (4) Elite Four members, then the Champion.
@@ -114,7 +145,7 @@ Chosen on a setup screen before the partner picker. Each adds a Rogue Token bonu
 |---|---|---|
 | Nuzlocke | Rogue Pokémon that faint in a won battle are released | +50% |
 | Solo | Route cards become trainers; legendaries pay 2× coins instead of joining | +100% |
-| Hard | Enemies +2 levels, one set tier higher, more held items | +50% |
+| Hard | Enemies +2 levels (plus max AI, archetypes and a tier bonus even if the config is set easier) | +50% |
 | No Shop | The run shop is closed (the bag still works) | +25% |
 | All Doubles | Every trainer battle is a double battle | +25% |
 
@@ -127,7 +158,7 @@ Chosen on a setup screen before the partner picker. Each adds a Rogue Token bonu
 
 - Each battle **spawns a temporary Cobblemon NPC** (class `cobbleroguelike:rogue_trainer`, standard model, no AI, invulnerable) a few blocks in front of the player. It is fought through `NPCBattleActor` with `StrongBattleAI`, at skill 1–5 as badges rise (gyms start one step higher). Cobblemon only sends out a trainer's Pokémon at battle start when the trainer has an entity, so an entity-less `TrainerBattleActor` left the battle stuck forever. The NPC is despawned 3 s after the battle ends. NPCs are tagged `cobbleroguelike_trainer`, and any left behind by a crash are removed when their chunk loads.
 - **`/rogue endbattle`** force-stops the current battle and ends the run. Non-ops can only use it during a run; `/rogue admin endbattle <player>` works on anyone.
-- The player fights with the run party directly, so **damage and fainting carry over** between battles. Rest stops heal, and so does beating a gym (`healAfterGym`).
+- The player fights with the run party directly, so **damage and fainting carry over** between battles. Rest stops heal. Beating a gym only heals if `healAfterGym` is on (off by default).
 - Trainer Pokémon are battle clones and can't be caught. The **Bag Clause** is on, so real-inventory items can't be used.
 - Run battles start with `canPreempt = false`. The outside-battle guard and other mods' pre-battle hooks can't cancel them.
 - **Losing or forfeiting ends the run.** An interrupted battle (a disconnect or server stop) can be challenged again from `/rogue`, against the same trainer.
@@ -220,14 +251,29 @@ Because the run is played in menus, **only the party is swapped**. The run's bag
 
 ---
 
-## 6. Co-op (v2, Coop+-inspired)
+## 6. Co-op (done, untested build; Coop+-inspired)
 
-- The party leader invites 1–2 players. Each player has **their own** single starter and catches on their own route nodes.
-- Path choice is decided by vote, or by the leader (configurable).
-- Normal trainers are fought 2v1 (both players against one trainer's doubles team). Gyms and the Champion are 2v2, with the leader and a partner NPC.
-- Each player controls only their own Pokémon, so the format is multi-battle, not shared-party.
-- Whiting out alone doesn't end the run; the run ends only if every player whites out.
-- Each player's journal and swap are independent.
+- **Lobby:**
+  - The host invites a friend (start page → Co-op run, or `/rogue invite`). Invites expire after `coopInviteSeconds`, and the invite is clickable in chat.
+  - Once accepted, both pick a partner from their own collection. The run starts once both have picked, with both journals written before anything is swapped.
+  - The host's run modifiers apply.
+- **State:**
+  - One shared `RunState` holds floor, biome, badges, coins, bag, modifiers and battles. It's stored under the host's id, and the partner's run file is only a `link` to it.
+  - Both players map to the same live object. On login the live instance is reused if the other player is online.
+- **Parties:** each player keeps their own run team, limited to `coopPartyLimit` (3). Level cap, EXP, Move Tutor, bag use and held items are all per player.
+- **Routes:** each player takes a different option or skips. The floor advances when both are done, or when the other player is offline. A full party gets its own release screen (`coopPending`).
+- **Battles:**
+  - Always Cobblemon `MULTI` (2 actors per side, 1 active each): two `PlayerBattleActor`s against two NPC trainers spawned side by side. The generated team is split between them; the lead trainer keeps the ace and the gimmick.
+  - Legendaries fight alongside a same-type companion Pokémon.
+  - A battle starts when both press **Ready** (`/rogue ready` works too). Both must be online, not in another battle, have a Pokémon able to fight, and stand within `coopMaxDistance` of each other in the same dimension.
+- **Results:**
+  - A win or loss is shared (the whole side wins or loses), and the rewards are shared coins.
+  - Nuzlocke releases fainted Pokémon for both players. The run ends if either player has none left.
+  - A legendary joins whichever player has room (host first); otherwise the host gets a release screen.
+- **Ending:**
+  - Any end (loss, win, `/rogue end`, `/rogue endbattle`, `/rogue clean`) finishes the run for both, and each player gets their own token payout.
+  - Offline players get their party back on their next login, because their link no longer resolves.
+  - Save & leave isn't available in co-op: log off instead, and battles wait.
 
 ---
 

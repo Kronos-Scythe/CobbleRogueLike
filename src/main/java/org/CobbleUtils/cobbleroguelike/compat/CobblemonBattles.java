@@ -140,6 +140,122 @@ public final class CobblemonBattles {
         return BattleFormat.Companion.setBattleRules(base, rules);
     }
 
+    // ---------------------------------------------------------------- co-op (multi battles)
+
+    /** Each co-op player's own team, fainted last; null if they have nothing able to fight. */
+    private static PlayerBattleActor coopActor(ServerPlayerEntity player) {
+        List<BattlePokemon> team = new ArrayList<>(CobblemonBridge.party(player).toBattleTeam(false, false, null));
+        team.sort(Comparator.comparing(pokemon -> pokemon.getHealth() <= 0));
+        if (team.isEmpty() || team.get(0).getHealth() <= 0) {
+            return null;
+        }
+        return new PlayerBattleActor(player.getUuid(), team);
+    }
+
+    /**
+     * Co-op trainer battle (Cobblemon's MULTI format: two actors per side, one Pokémon each). The
+     * two players fight two NPC trainers, spawned side by side in front of the first player. The
+     * gimmick (if any) belongs to the first trainer's ace.
+     */
+    public static PokemonBattle startCoopTrainerBattle(ServerPlayerEntity first, ServerPlayerEntity second,
+                                                       String name1, List<Pokemon> team1,
+                                                       String name2, List<Pokemon> team2,
+                                                       int aiSkill, String gimmick) {
+        PlayerBattleActor actor1 = coopActor(first);
+        PlayerBattleActor actor2 = coopActor(second);
+        if (actor1 == null || actor2 == null || team1.isEmpty() || team2.isEmpty()) {
+            return null;
+        }
+        int skill = Math.max(0, Math.min(5, aiSkill));
+        NPCEntity npc1 = RunEntities.spawn(first, name1, topLevel(team1), -1.5);
+        NPCEntity npc2 = RunEntities.spawn(first, name2, topLevel(team2), 1.5);
+        if (npc1 == null || npc2 == null) {
+            RunEntities.despawn(npc1);
+            RunEntities.despawn(npc2);
+            return null;
+        }
+        BattleAI ai1 = new StrongBattleAI(skill);
+        if (gimmick != null && !gimmick.isEmpty()) {
+            ai1 = new GimmickAI(ai1, gimmick, CobblemonBridge.propertyId(team1.get(team1.size() - 1).getSpecies()));
+            ItemStack keyItem = ItemBridge.stack(gimmick.equals("mega") ? "mega_showdown:mega_bracelet" : "mega_showdown:tera_orb");
+            if (!keyItem.isEmpty()) {
+                npc1.equipStack(EquipmentSlot.MAINHAND, keyItem);
+            }
+        }
+        NPCBattleActor trainer1 = new NPCBattleActor(npc1, battleTeam(team1), skill, ai1);
+        NPCBattleActor trainer2 = new NPCBattleActor(npc2, battleTeam(team2), skill, new StrongBattleAI(skill));
+
+        BattleStartResult result = BattleRegistry.startBattle(withBagClause(BattleFormat.Companion.getGEN_9_MULTI()),
+                new BattleSide(actor1, actor2), new BattleSide(trainer1, trainer2), false);
+        if (!(result instanceof SuccessfulBattleStart success)) {
+            RunEntities.despawn(npc1);
+            RunEntities.despawn(npc2);
+            return null;
+        }
+        PokemonBattle battle = success.getBattle();
+        MinecraftServer server = first.getServer();
+        onEnd(battle, ended -> server.execute(() -> Scheduler.runLater(60, () -> {
+            RunEntities.despawn(npc1);
+            RunEntities.despawn(npc2);
+        })));
+        return battle;
+    }
+
+    /** Co-op legendary battle: the legendary plus a companion Pokémon, both wild and uncatchable. */
+    public static PokemonBattle startCoopWildBattle(ServerPlayerEntity first, ServerPlayerEntity second,
+                                                    String legendary, String companion, int aiSkill) {
+        PlayerBattleActor actor1 = coopActor(first);
+        PlayerBattleActor actor2 = coopActor(second);
+        if (actor1 == null || actor2 == null) {
+            return null;
+        }
+        PokemonEntity entity1 = RunEntities.spawnWild(first, legendary, -1.5);
+        PokemonEntity entity2 = RunEntities.spawnWild(first, companion, 1.5);
+        if (entity1 == null || entity2 == null) {
+            RunEntities.despawn(entity1);
+            RunEntities.despawn(entity2);
+            return null;
+        }
+        int skill = Math.max(0, Math.min(5, aiSkill));
+        PokemonBattleActor wild1 = new PokemonBattleActor(entity1.getPokemon().getUuid(),
+                new BattlePokemon(entity1.getPokemon(), entity1.getPokemon(), ignored -> Unit.INSTANCE), 64.0F, new StrongBattleAI(skill));
+        PokemonBattleActor wild2 = new PokemonBattleActor(entity2.getPokemon().getUuid(),
+                new BattlePokemon(entity2.getPokemon(), entity2.getPokemon(), ignored -> Unit.INSTANCE), 64.0F, new StrongBattleAI(skill));
+
+        BattleStartResult result = BattleRegistry.startBattle(withBagClause(BattleFormat.Companion.getGEN_9_MULTI()),
+                new BattleSide(actor1, actor2), new BattleSide(wild1, wild2), false);
+        if (!(result instanceof SuccessfulBattleStart success)) {
+            RunEntities.despawn(entity1);
+            RunEntities.despawn(entity2);
+            return null;
+        }
+        PokemonBattle battle = success.getBattle();
+        entity1.setBattleId(battle.getBattleId());
+        entity2.setBattleId(battle.getBattleId());
+        MinecraftServer server = first.getServer();
+        onEnd(battle, ended -> server.execute(() -> Scheduler.runLater(40, () -> {
+            RunEntities.despawn(entity1);
+            RunEntities.despawn(entity2);
+        })));
+        return battle;
+    }
+
+    private static List<BattlePokemon> battleTeam(List<Pokemon> team) {
+        List<BattlePokemon> result = new ArrayList<>();
+        for (Pokemon pokemon : team) {
+            result.add(BattlePokemon.Companion.safeCopyOf(pokemon));
+        }
+        return result;
+    }
+
+    private static int topLevel(List<Pokemon> team) {
+        int level = 1;
+        for (Pokemon pokemon : team) {
+            level = Math.max(level, pokemon.getLevel());
+        }
+        return level;
+    }
+
     /** Force-stops the battle the player is in. Returns false if they aren't in one. */
     public static boolean stopBattle(ServerPlayerEntity player) {
         PokemonBattle battle = BattleRegistry.getBattleByParticipatingPlayer(player);

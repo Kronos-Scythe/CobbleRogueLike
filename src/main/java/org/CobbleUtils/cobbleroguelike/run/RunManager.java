@@ -8,6 +8,7 @@ import net.minecraft.nbt.NbtList;
 import net.minecraft.registry.DynamicRegistryManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.ClickEvent;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import org.CobbleUtils.cobbleroguelike.Cobbleroguelike;
@@ -17,6 +18,7 @@ import org.CobbleUtils.cobbleroguelike.compat.CobblemonBridge;
 import org.CobbleUtils.cobbleroguelike.run.RunState.NodeType;
 import org.CobbleUtils.cobbleroguelike.run.RunState.Phase;
 import org.CobbleUtils.cobbleroguelike.shop.ShopCatalog;
+import org.CobbleUtils.cobbleroguelike.ui.MenuScreenHandler;
 import org.CobbleUtils.cobbleroguelike.ui.RogueMenus;
 import org.CobbleUtils.cobbleroguelike.util.Scheduler;
 
@@ -110,8 +112,12 @@ public final class RunManager {
                     restore(player);
                     message(player, "Your rogue run could not be resumed and has ended. Your party has been restored.", Formatting.YELLOW);
                 } else {
+                    state = liveInstance(state);
                     repair(state);
                     active.put(id, state);
+                    if (state.isCoop()) {
+                        tell(state, player.getName().getString() + " is back in the co-op run.", Formatting.AQUA);
+                    }
                     message(player, "You have a rogue run in progress. Use /rogue to continue.", Formatting.AQUA);
                 }
             } else if (run) {
@@ -171,6 +177,11 @@ public final class RunManager {
             message(player, "Finish your battle before cleaning up.", Formatting.RED);
             return false;
         }
+        RunState current = active.get(id);
+        if (current != null && current.isCoop()) {
+            finish(player, "You ended the co-op run.", false);
+            return true;
+        }
         if (!active.containsKey(id) && !storage.hasJournal(id) && isSuspended(readRunOrNull(player))) {
             purgeStrayRogueMons(player);
             message(player, "Your saved run is safe, and there's nothing else to clean up.", Formatting.GREEN);
@@ -197,7 +208,16 @@ public final class RunManager {
 
     public void onDisconnect(ServerPlayerEntity player) {
         // The run and journal are already on disk, so the player can resume later.
-        active.remove(player.getUuid());
+        RunState state = active.remove(player.getUuid());
+        if (state != null) {
+            state.ready.remove(player.getUuid());
+            if (state.isCoop()) {
+                tell(state, player.getName().getString() + " left. Battles wait until they're back.", Formatting.YELLOW);
+                maybeFinishCoopRoute(state);
+            }
+        }
+        leaveLobby(player);
+        invites.remove(player.getUuid());
     }
 
     // ---------------------------------------------------------------- start / end
@@ -241,6 +261,11 @@ public final class RunManager {
             openCurrent(player);
             return;
         }
+        Lobby lobby = lobbies.get(id);
+        if (lobby != null) {
+            lobbyPick(player, lobby, partnerId);
+            return;
+        }
         if (CobblemonBridge.isInBattle(player)) {
             message(player, "You can't start a run while in a battle.", Formatting.RED);
             return;
@@ -269,30 +294,14 @@ public final class RunManager {
         Pokemon partner = CobblemonBridge.createRogueCopy(original, registries,
                 config.resetStarterLevel ? config.starterLevel : 0);
 
-        List<Pokemon> realParty = CobblemonBridge.partyMembers(player);
-        NbtList saved = new NbtList();
-        for (Pokemon pokemon : realParty) {
-            saved.add(CobblemonBridge.save(pokemon, registries));
-        }
-        NbtCompound journal = new NbtCompound();
-        journal.putInt("version", 1);
-        journal.put("party", saved);
-
         // Journal first: nothing is touched until the real party is safely on disk.
-        try {
-            storage.writeJournal(id, journal);
-        } catch (IOException e) {
-            Cobbleroguelike.LOGGER.error("Failed to write rogue journal for {}", player.getName().getString(), e);
+        if (!writeJournal(player)) {
             message(player, "Could not start a run (failed to save your party).", Formatting.RED);
             return;
         }
 
         try {
-            for (Pokemon pokemon : realParty) {
-                CobblemonBridge.recall(pokemon);
-                CobblemonBridge.party(player).remove(pokemon);
-            }
-            CobblemonBridge.party(player).add(partner);
+            swapInPartner(player, partner);
             RunState state = new RunState(id, new Random().nextLong());
             state.money = RogueConfig.get().startingMoney;
             state.modifiers.addAll(pendingModifiers.getOrDefault(id, Set.of()));
@@ -317,6 +326,34 @@ public final class RunManager {
         openCurrent(player);
     }
 
+    /** Journals the player's real party. Must succeed before anything is swapped. */
+    private boolean writeJournal(ServerPlayerEntity player) {
+        DynamicRegistryManager registries = player.getRegistryManager();
+        NbtList saved = new NbtList();
+        for (Pokemon pokemon : CobblemonBridge.partyMembers(player)) {
+            saved.add(CobblemonBridge.save(pokemon, registries));
+        }
+        NbtCompound journal = new NbtCompound();
+        journal.putInt("version", 1);
+        journal.put("party", saved);
+        try {
+            storage.writeJournal(player.getUuid(), journal);
+            return true;
+        } catch (IOException e) {
+            Cobbleroguelike.LOGGER.error("Failed to write rogue journal for {}", player.getName().getString(), e);
+            return false;
+        }
+    }
+
+    /** Replaces the (journaled) real party with the run partner. */
+    private void swapInPartner(ServerPlayerEntity player, Pokemon partner) {
+        for (Pokemon pokemon : CobblemonBridge.partyMembers(player)) {
+            CobblemonBridge.recall(pokemon);
+            CobblemonBridge.party(player).remove(pokemon);
+        }
+        CobblemonBridge.party(player).add(partner);
+    }
+
     /** Ends the run: deletes the rogue party and gives the player back their real one. */
     public void end(ServerPlayerEntity player, String reason) {
         if (CobblemonBridge.isInBattle(player)) {
@@ -329,6 +366,10 @@ public final class RunManager {
     /** Ends the run with a Rogue Token payout for the progress made, then restores the real party. */
     private void finish(ServerPlayerEntity player, String reason, boolean won) {
         RunState state = active.get(player.getUuid());
+        if (state != null && state.isCoop()) {
+            finishCoop(state, reason, won);
+            return;
+        }
         try {
             restore(player);
             message(player, reason + " Your party has been restored.", Formatting.GOLD);
@@ -342,20 +383,27 @@ public final class RunManager {
     }
 
     private void payOut(ServerPlayerEntity player, RunState state, boolean won) {
+        payOut(player.getUuid(), player, state, won);
+    }
+
+    /** {@code player} may be null (offline co-op member): tokens are still paid. */
+    private void payOut(UUID id, ServerPlayerEntity player, RunState state, boolean won) {
         RogueConfig config = RogueConfig.get();
         int floorsCleared = Math.max(0, state.floor - 1);
         int base = floorsCleared * config.tokensPerFloor + state.badges * config.tokensPerBadge
                 + (won ? config.championTokenBonus : 0);
         int tokens = (int) Math.round(base * (1.0 + Modifiers.totalBonus(state.modifiers)));
-        NbtCompound profile = storage.readProfile(player.getUuid());
+        NbtCompound profile = storage.readProfile(id);
         profile.putInt("tokens", profile.getInt("tokens") + tokens);
         profile.putInt("runs", profile.getInt("runs") + 1);
         profile.putInt("wins", profile.getInt("wins") + (won ? 1 : 0));
         profile.putInt("bestFloor", Math.max(profile.getInt("bestFloor"), state.floor));
         profile.putInt("bestBadges", Math.max(profile.getInt("bestBadges"), state.badges));
-        saveProfile(player, profile);
-        message(player, "+" + tokens + " Rogue Tokens (" + profile.getInt("tokens")
-                + " total). Spend them with /rogue shop.", Formatting.LIGHT_PURPLE);
+        saveProfile(id, profile);
+        if (player != null) {
+            message(player, "+" + tokens + " Rogue Tokens (" + profile.getInt("tokens")
+                    + " total). Spend them in the Rogue Shop.", Formatting.LIGHT_PURPLE);
+        }
     }
 
     /** The player's persistent profile: tokens, runs, wins, bestFloor, bestBadges. */
@@ -375,15 +423,15 @@ public final class RunManager {
             return false;
         }
         profile.putInt("tokens", updated);
-        return saveProfile(player, profile);
+        return saveProfile(player.getUuid(), profile);
     }
 
-    private boolean saveProfile(ServerPlayerEntity player, NbtCompound profile) {
+    private boolean saveProfile(UUID id, NbtCompound profile) {
         try {
-            storage.writeProfile(player.getUuid(), profile);
+            storage.writeProfile(id, profile);
             return true;
         } catch (IOException e) {
-            Cobbleroguelike.LOGGER.error("Failed to save rogue profile for {}", player.getName().getString(), e);
+            Cobbleroguelike.LOGGER.error("Failed to save rogue profile for {}", id, e);
             return false;
         }
     }
@@ -475,6 +523,10 @@ public final class RunManager {
         RunState state = active.get(player.getUuid());
         if (state == null) {
             message(player, "You don't have an active run.", Formatting.RED);
+            return;
+        }
+        if (state.isCoop()) {
+            message(player, "Save & leave isn't available in co-op runs yet. You can log off; the run waits for you.", Formatting.YELLOW);
             return;
         }
         if (CobblemonBridge.isInBattle(player)) {
@@ -615,6 +667,454 @@ public final class RunManager {
         return removed;
     }
 
+
+    // ---------------------------------------------------------------- co-op
+
+    private static final class Lobby {
+        final UUID host;
+        final UUID guest;
+        UUID hostPick;
+        UUID guestPick;
+
+        Lobby(UUID host, UUID guest) {
+            this.host = host;
+            this.guest = guest;
+        }
+
+        UUID other(UUID id) {
+            return id.equals(host) ? guest : host;
+        }
+    }
+
+    private record Invite(UUID from, long expiresAt) {
+    }
+
+    /** Invitee to their pending invite. */
+    private final Map<UUID, Invite> invites = new HashMap<>();
+    /** Both lobby members map to their lobby (before the co-op run starts). */
+    private final Map<UUID, Lobby> lobbies = new HashMap<>();
+
+    private ServerPlayerEntity online(UUID id) {
+        return id == null ? null : server.getPlayerManager().getPlayer(id);
+    }
+
+    /** Party size limit for a run: 3 per player in co-op (configurable), 6 solo. */
+    public static int partyLimit(RunState state) {
+        return state.isCoop() ? Math.max(1, Math.min(6, RogueConfig.get().coopPartyLimit)) : 6;
+    }
+
+    public boolean inLobby(ServerPlayerEntity player) {
+        return lobbies.containsKey(player.getUuid());
+    }
+
+    /** Name of the player who invited this one, or null (invites expire). */
+    public String pendingInviteFrom(ServerPlayerEntity player) {
+        Invite invite = invites.get(player.getUuid());
+        if (invite == null || invite.expiresAt() < System.currentTimeMillis()) {
+            invites.remove(player.getUuid());
+            return null;
+        }
+        ServerPlayerEntity from = online(invite.from());
+        return from == null ? null : from.getName().getString();
+    }
+
+    private boolean busy(ServerPlayerEntity player) {
+        UUID id = player.getUuid();
+        return active.containsKey(id) || lobbies.containsKey(id) || storage.hasJournal(id) || savedRun(player) != null;
+    }
+
+    public void invite(ServerPlayerEntity inviter, ServerPlayerEntity target) {
+        if (inviter.getUuid().equals(target.getUuid())) {
+            message(inviter, "You can't invite yourself.", Formatting.RED);
+            return;
+        }
+        if (busy(inviter)) {
+            message(inviter, "Finish (or end) your current run first.", Formatting.RED);
+            return;
+        }
+        if (busy(target)) {
+            message(inviter, target.getName().getString() + " is already in a run.", Formatting.RED);
+            return;
+        }
+        invites.put(target.getUuid(), new Invite(inviter.getUuid(),
+                System.currentTimeMillis() + RogueConfig.get().coopInviteSeconds * 1000L));
+        message(inviter, "Co-op invite sent to " + target.getName().getString() + ".", Formatting.GREEN);
+        target.sendMessage(Text.literal(inviter.getName().getString() + " invited you to a co-op rogue run! ").formatted(Formatting.AQUA)
+                .append(Text.literal("[Accept]").formatted(Formatting.GREEN, Formatting.BOLD)
+                        .styled(style -> style.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/rogue accept"))))
+                .append(Text.literal(" "))
+                .append(Text.literal("[Decline]").formatted(Formatting.RED)
+                        .styled(style -> style.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/rogue decline")))), false);
+    }
+
+    public void accept(ServerPlayerEntity player) {
+        Invite invite = invites.remove(player.getUuid());
+        ServerPlayerEntity host = invite == null || invite.expiresAt() < System.currentTimeMillis() ? null : online(invite.from());
+        if (host == null) {
+            message(player, "You don't have a valid co-op invite.", Formatting.RED);
+            return;
+        }
+        if (busy(player) || busy(host)) {
+            message(player, "One of you is already in a run.", Formatting.RED);
+            return;
+        }
+        Lobby lobby = new Lobby(host.getUuid(), player.getUuid());
+        lobbies.put(host.getUuid(), lobby);
+        lobbies.put(player.getUuid(), lobby);
+        int limit = Math.max(1, Math.min(6, RogueConfig.get().coopPartyLimit));
+        for (ServerPlayerEntity member : List.of(host, player)) {
+            message(member, "Co-op lobby with " + online(lobby.other(member.getUuid())).getName().getString()
+                    + ". Pick your partner! (Up to " + limit + " Pokémon each.)", Formatting.AQUA);
+            RogueMenus.partnerPicker(member, 0);
+        }
+    }
+
+    public void decline(ServerPlayerEntity player) {
+        Invite invite = invites.remove(player.getUuid());
+        if (invite == null) {
+            message(player, "You don't have a co-op invite.", Formatting.RED);
+            return;
+        }
+        message(player, "Invite declined.", Formatting.GRAY);
+        ServerPlayerEntity from = online(invite.from());
+        if (from != null) {
+            message(from, player.getName().getString() + " declined your co-op invite.", Formatting.GRAY);
+        }
+    }
+
+    public void leaveLobby(ServerPlayerEntity player) {
+        Lobby lobby = lobbies.remove(player.getUuid());
+        if (lobby == null) {
+            return;
+        }
+        UUID otherId = lobby.other(player.getUuid());
+        lobbies.remove(otherId);
+        ServerPlayerEntity other = online(otherId);
+        if (other != null) {
+            message(other, player.getName().getString() + " left the co-op lobby.", Formatting.YELLOW);
+        }
+    }
+
+    private void lobbyPick(ServerPlayerEntity player, Lobby lobby, UUID pokemonId) {
+        Pokemon original = CobblemonBridge.findOwned(player, pokemonId);
+        if (original == null || CobblemonBridge.isRogue(original)) {
+            message(player, "That Pokémon isn't available anymore.", Formatting.RED);
+            RogueMenus.partnerPicker(player, 0);
+            return;
+        }
+        if (player.getUuid().equals(lobby.host)) {
+            lobby.hostPick = pokemonId;
+        } else {
+            lobby.guestPick = pokemonId;
+        }
+        if (lobby.hostPick != null && lobby.guestPick != null) {
+            beginCoopRun(lobby);
+            return;
+        }
+        player.closeHandledScreen();
+        ServerPlayerEntity other = online(lobby.other(player.getUuid()));
+        message(player, "Partner chosen! Waiting for " + (other == null ? "your partner" : other.getName().getString()) + "...", Formatting.GREEN);
+        if (other != null) {
+            message(other, player.getName().getString() + " has picked their partner.", Formatting.AQUA);
+        }
+    }
+
+    private void beginCoopRun(Lobby lobby) {
+        lobbies.remove(lobby.host);
+        lobbies.remove(lobby.guest);
+        ServerPlayerEntity host = online(lobby.host);
+        ServerPlayerEntity guest = online(lobby.guest);
+        List<ServerPlayerEntity> members = new ArrayList<>();
+        if (host != null) {
+            members.add(host);
+        }
+        if (guest != null) {
+            members.add(guest);
+        }
+        if (host == null || guest == null) {
+            members.forEach(p -> message(p, "Your co-op partner went offline.", Formatting.RED));
+            return;
+        }
+        for (ServerPlayerEntity member : members) {
+            if (CobblemonBridge.isInBattle(member) || storage.hasJournal(member.getUuid()) || savedRun(member) != null) {
+                members.forEach(p -> message(p, member.getName().getString() + " can't start a run right now.", Formatting.RED));
+                return;
+            }
+        }
+        RogueConfig config = RogueConfig.get();
+        Pokemon hostOriginal = CobblemonBridge.findOwned(host, lobby.hostPick);
+        Pokemon guestOriginal = CobblemonBridge.findOwned(guest, lobby.guestPick);
+        if (hostOriginal == null || guestOriginal == null) {
+            members.forEach(p -> message(p, "A chosen partner isn't available anymore.", Formatting.RED));
+            return;
+        }
+        Pokemon hostCopy = CobblemonBridge.createRogueCopy(hostOriginal, host.getRegistryManager(), config.resetStarterLevel ? config.starterLevel : 0);
+        Pokemon guestCopy = CobblemonBridge.createRogueCopy(guestOriginal, guest.getRegistryManager(), config.resetStarterLevel ? config.starterLevel : 0);
+
+        // Both journals first; nothing is swapped until both real parties are on disk.
+        if (!writeJournal(host)) {
+            members.forEach(p -> message(p, "Could not start the run (failed to save a party).", Formatting.RED));
+            return;
+        }
+        if (!writeJournal(guest)) {
+            try {
+                storage.deleteJournal(host.getUuid());
+            } catch (IOException ignored) {
+                // restored on the host's next login at worst
+            }
+            members.forEach(p -> message(p, "Could not start the run (failed to save a party).", Formatting.RED));
+            return;
+        }
+        RunState state;
+        try {
+            swapInPartner(host, hostCopy);
+            swapInPartner(guest, guestCopy);
+            state = new RunState(host.getUuid(), new Random().nextLong());
+            state.partnerId = guest.getUuid();
+            state.money = config.startingMoney;
+            state.modifiers.addAll(pendingModifiers.getOrDefault(host.getUuid(), Set.of()));
+            pendingModifiers.remove(host.getUuid());
+            state.biome = Biomes.roll(state, new Random(state.seed ^ 0x5EEDB10EL));
+            advanceFloor(state);
+            storage.writeRun(state);
+            active.put(host.getUuid(), state);
+            active.put(guest.getUuid(), state);
+        } catch (IOException | RuntimeException e) {
+            Cobbleroguelike.LOGGER.error("Failed to start co-op run, rolling back", e);
+            for (ServerPlayerEntity member : members) {
+                try {
+                    restore(member);
+                } catch (IOException | RuntimeException rollback) {
+                    Cobbleroguelike.LOGGER.error("Rollback failed for {}; journal kept on disk", member.getName().getString(), rollback);
+                }
+                message(member, "Could not start the co-op run. Your party is unchanged.", Formatting.RED);
+            }
+            return;
+        }
+        tell(state, "Co-op run started! " + host.getName().getString() + " & " + guest.getName().getString()
+                + ", every battle is a 2v2 and you both need to be ready to fight.", Formatting.GREEN);
+        members.forEach(this::openCurrent);
+    }
+
+    /** Messages every online member of the run. */
+    private void tell(RunState state, String text, Formatting color) {
+        for (UUID id : state.members()) {
+            ServerPlayerEntity member = online(id);
+            if (member != null) {
+                message(member, text, color);
+            }
+        }
+    }
+
+    /** Re-opens run menus for co-op members (except one) who currently have one of our menus open. */
+    private void refreshOthers(RunState state, UUID except) {
+        if (!state.isCoop()) {
+            return;
+        }
+        for (UUID id : state.members()) {
+            ServerPlayerEntity member = online(id);
+            if (member != null && !id.equals(except) && member.currentScreenHandler instanceof MenuScreenHandler) {
+                openCurrent(member);
+            }
+        }
+    }
+
+    /** Reuse the live shared state when the other co-op player is already online. */
+    private RunState liveInstance(RunState loaded) {
+        for (UUID id : loaded.members()) {
+            RunState live = active.get(id);
+            if (live != null) {
+                return live;
+            }
+        }
+        return loaded;
+    }
+
+    public String partnerName(RunState state, UUID viewer) {
+        UUID other = state.other(viewer);
+        if (other == null) {
+            return "";
+        }
+        ServerPlayerEntity player = online(other);
+        return player != null ? player.getName().getString() : "your partner (offline)";
+    }
+
+    /** Co-op: a player is done with the route once they picked, skipped, or are offline. */
+    private void maybeFinishCoopRoute(RunState state) {
+        if (state.phase != Phase.ENCOUNTER) {
+            return;
+        }
+        for (UUID id : state.members()) {
+            if (!state.coopPicks.containsKey(id) && online(id) != null) {
+                return;
+            }
+        }
+        state.coopPicks.clear();
+        state.encounterOptions.clear();
+        advanceFloor(state);
+    }
+
+    private void coopChooseEncounter(ServerPlayerEntity player, RunState state, int index) {
+        UUID id = player.getUuid();
+        if (state.coopPicks.containsKey(id)) {
+            message(player, "You already chose; waiting for " + partnerName(state, id) + ".", Formatting.YELLOW);
+            openCurrent(player);
+            return;
+        }
+        if (index >= 0) {
+            if (index >= state.encounterOptions.size()) {
+                openCurrent(player);
+                return;
+            }
+            if (state.coopPicks.containsValue(index)) {
+                message(player, partnerName(state, id) + " already took that one. Pick another!", Formatting.RED);
+                openCurrent(player);
+                return;
+            }
+            String picked = state.encounterOptions.get(index);
+            if (CobblemonBridge.partyMembers(player).size() >= partyLimit(state)) {
+                state.coopPending.put(id, picked);
+            } else {
+                CobblemonBridge.party(player).add(CobblemonBridge.createRogue(picked));
+            }
+        }
+        state.coopPicks.put(id, index);
+        maybeFinishCoopRoute(state);
+        save(player, state);
+        openCurrent(player);
+        refreshOthers(state, id);
+    }
+
+    private void coopRelease(ServerPlayerEntity player, RunState state, int partyIndex) {
+        UUID id = player.getUuid();
+        String pending = state.coopPending.remove(id);
+        if (pending != null) {
+            List<Pokemon> party = CobblemonBridge.partyMembers(player);
+            if (partyIndex >= 0 && partyIndex < party.size()) {
+                Pokemon released = party.get(partyIndex);
+                CobblemonBridge.recall(released);
+                CobblemonBridge.party(player).remove(released);
+                CobblemonBridge.party(player).add(CobblemonBridge.createRogue(pending));
+            }
+        }
+        maybeFinishCoopRoute(state);
+        save(player, state);
+        openCurrent(player);
+        refreshOthers(state, id);
+    }
+
+    /** Co-op battles start once both players pressed Ready and stand close together. */
+    private void coopReady(ServerPlayerEntity player, RunState state) {
+        UUID id = player.getUuid();
+        state.ready.add(id);
+        ServerPlayerEntity other = online(state.other(id));
+        if (other == null) {
+            message(player, "Ready! " + partnerName(state, id) + " needs to come back online to fight.", Formatting.YELLOW);
+            openCurrent(player);
+            return;
+        }
+        if (!state.ready.contains(other.getUuid())) {
+            message(player, "Ready! Waiting for " + other.getName().getString() + "...", Formatting.GREEN);
+            other.sendMessage(Text.literal(player.getName().getString() + " is ready to fight " + state.battleName + "! ").formatted(Formatting.AQUA)
+                    .append(Text.literal("[Ready]").formatted(Formatting.GREEN, Formatting.BOLD)
+                            .styled(style -> style.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/rogue ready")))), false);
+            openCurrent(player);
+            refreshOthers(state, id);
+            return;
+        }
+        ServerPlayerEntity host = online(state.playerId);
+        ServerPlayerEntity guest = online(state.partnerId);
+        state.ready.clear();
+        for (ServerPlayerEntity member : List.of(host, guest)) {
+            if (CobblemonBridge.isInBattle(member)) {
+                tell(state, member.getName().getString() + " is already in a battle.", Formatting.RED);
+                return;
+            }
+            if (CobblemonBridge.healthyCount(member) == 0) {
+                tell(state, member.getName().getString() + " has no Pokémon able to fight. Heal with the Bag first.", Formatting.RED);
+                return;
+            }
+        }
+        int maxDistance = RogueConfig.get().coopMaxDistance;
+        if (host.getServerWorld() != guest.getServerWorld() || host.squaredDistanceTo(guest) > (double) maxDistance * maxDistance) {
+            tell(state, "Stand together (within " + maxDistance + " blocks) to start the battle.", Formatting.YELLOW);
+            return;
+        }
+        if (state.battleTeam.isEmpty() || state.battleTeam2.isEmpty()) {
+            tell(state, "This battle isn't set up for co-op; skipping it.", Formatting.RED);
+            state.clearBattle();
+            advanceFloor(state);
+            save(player, state);
+            state.members().forEach(m -> {
+                ServerPlayerEntity p = online(m);
+                if (p != null) {
+                    openCurrent(p);
+                }
+            });
+            return;
+        }
+        PokemonBattle battle;
+        if (state.battleKind == NodeType.LEGENDARY) {
+            battle = CobblemonBattles.startCoopWildBattle(host, guest, state.battleTeam.get(0), state.battleTeam2.get(0), state.battleSkill);
+        } else {
+            List<Pokemon> team1 = new ArrayList<>();
+            state.battleTeam.forEach(props -> team1.add(CobblemonBridge.create(props)));
+            List<Pokemon> team2 = new ArrayList<>();
+            state.battleTeam2.forEach(props -> team2.add(CobblemonBridge.create(props)));
+            battle = CobblemonBattles.startCoopTrainerBattle(host, guest, state.battleName, team1, state.battleName2, team2,
+                    state.battleSkill, state.battleGimmick);
+        }
+        if (battle == null) {
+            tell(state, "The battle couldn't start. Make sure both of you have a Pokémon able to fight.", Formatting.RED);
+            return;
+        }
+        host.closeHandledScreen();
+        guest.closeHandledScreen();
+        UUID hostId = state.playerId;
+        CobblemonBattles.onEnd(battle, ended -> {
+            Boolean won = CobblemonBattles.playerWon(ended, hostId);
+            server.execute(() -> onBattleEnded(hostId, won));
+        });
+    }
+
+    /** Co-op legendary reward: joins whoever has room (host first); otherwise the host gets a release screen. */
+    private void coopRecruit(RunState state, String properties) {
+        int limit = partyLimit(state);
+        for (UUID id : state.members()) {
+            ServerPlayerEntity member = online(id);
+            if (member != null && CobblemonBridge.partyMembers(member).size() < limit) {
+                CobblemonBridge.party(member).add(CobblemonBridge.createRogue(properties));
+                tell(state, "It joins " + member.getName().getString() + "'s team!", Formatting.LIGHT_PURPLE);
+                return;
+            }
+        }
+        UUID target = online(state.playerId) != null ? state.playerId : state.partnerId;
+        state.coopPending.put(target, properties);
+    }
+
+    private void finishCoop(RunState state, String reason, boolean won) {
+        for (UUID id : state.members()) {
+            active.remove(id);
+            ServerPlayerEntity member = online(id);
+            if (member != null) {
+                try {
+                    restore(member);
+                    message(member, reason + " Your party has been restored.", Formatting.GOLD);
+                } catch (IOException | RuntimeException e) {
+                    Cobbleroguelike.LOGGER.error("Failed to end co-op run for {}", member.getName().getString(), e);
+                    message(member, "Failed to restore your party. Nothing was lost; ask an admin to check the log.", Formatting.RED);
+                }
+            }
+            // Offline members are restored on their next login (their run link no longer resolves).
+            payOut(id, member, state, won);
+        }
+        try {
+            storage.deleteRun(state.playerId);
+        } catch (IOException e) {
+            Cobbleroguelike.LOGGER.error("Failed to delete co-op run file", e);
+        }
+    }
+
     // ---------------------------------------------------------------- run flow
 
     public void openCurrent(ServerPlayerEntity player) {
@@ -627,10 +1127,15 @@ public final class RunManager {
             message(player, "Finish your battle first. Stuck? Use /rogue endbattle (this ends your run).", Formatting.RED);
             return;
         }
+        String coopPending = state.coopPending.get(player.getUuid());
+        if (coopPending != null) {
+            RogueMenus.release(player, state, coopPending);
+            return;
+        }
         switch (state.phase) {
             case CHOOSE_NODE -> RogueMenus.path(player, state);
             case ENCOUNTER -> RogueMenus.encounter(player, state);
-            case RELEASE -> RogueMenus.release(player, state);
+            case RELEASE -> RogueMenus.release(player, state, state.pendingEncounter);
             case BATTLE -> RogueMenus.battle(player, state);
         }
     }
@@ -643,20 +1148,23 @@ public final class RunManager {
         switch (state.nodeChoices.get(index)) {
             case ROUTE -> {
                 state.encounterOptions = rollEncounters(state);
+                state.coopPicks.clear();
                 state.phase = Phase.ENCOUNTER;
             }
             case REST -> {
-                CobblemonBridge.healParty(player);
-                message(player, "Your team rested and is fully healed.", Formatting.GREEN);
+                onlineMembers(state).forEach(CobblemonBridge::healParty);
+                tell(state, state.isCoop() ? "Your teams rested and are fully healed." : "Your team rested and is fully healed.", Formatting.GREEN);
                 advanceFloor(state);
             }
             case TRAINER, GYM, ELITE, CHAMPION, LEGENDARY -> {
                 TrainerGenerator.prepare(state, state.nodeChoices.get(index), rng(state, 10 + index));
+                state.ready.clear();
                 state.phase = Phase.BATTLE;
             }
         }
         save(player, state);
         openCurrent(player);
+        refreshOthers(state, player.getUuid());
     }
 
     /** Starts the prepared battle. The outcome arrives later through {@link #onBattleEnded}. */
@@ -667,6 +1175,10 @@ public final class RunManager {
         }
         if (CobblemonBridge.isInBattle(player)) {
             message(player, "You're already in a battle.", Formatting.RED);
+            return;
+        }
+        if (state.isCoop()) {
+            coopReady(player, state);
             return;
         }
         List<Pokemon> team = new ArrayList<>();
@@ -699,27 +1211,41 @@ public final class RunManager {
      * can be challenged again, and damage taken so far carries over. A loss or forfeit ends the run.
      */
     private void onBattleEnded(UUID playerId, Boolean won) {
-        if (endingByCommand.contains(playerId)) {
-            return;
-        }
-        ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
         RunState state = active.get(playerId);
-        if (player == null || state == null || state.phase != Phase.BATTLE) {
+        if (state == null || state.phase != Phase.BATTLE
+                || state.members().stream().anyMatch(endingByCommand::contains)) {
             return;
         }
+        // Any online member can carry the result (in co-op the host may have logged off).
+        ServerPlayerEntity player = online(playerId);
+        for (UUID id : state.members()) {
+            if (player == null) {
+                player = online(id);
+            }
+        }
+        if (player == null) {
+            return;
+        }
+        state.ready.clear();
         if (won == null) {
-            message(player, "The battle was interrupted. Use /rogue to challenge again.", Formatting.YELLOW);
+            tell(state, "The battle was interrupted. Use /rogue to challenge again.", Formatting.YELLOW);
             return;
         }
         if (!won) {
-            finish(player, "You blacked out on floor " + state.floor + " with " + state.badges + " badge"
-                    + (state.badges == 1 ? "" : "s") + ". Your run is over.", false);
+            finish(player, (state.isCoop() ? "You were both defeated" : "You blacked out") + " on floor " + state.floor
+                    + " with " + state.badges + " badge" + (state.badges == 1 ? "" : "s") + ". Your run is over.", false);
             return;
         }
         int reward = battleReward(state);
         state.money += reward;
         if (Modifiers.has(state, Modifiers.NUZLOCKE)) {
-            releaseFainted(player);
+            for (ServerPlayerEntity member : onlineMembers(state)) {
+                releaseFainted(member);
+                if (CobblemonBridge.partyMembers(member).isEmpty()) {
+                    finish(member, member.getName().getString() + " has no Pokémon left. The run is over.", false);
+                    return;
+                }
+            }
         }
         switch (state.battleKind) {
             case CHAMPION -> {
@@ -729,16 +1255,16 @@ public final class RunManager {
             case GYM -> {
                 state.badges++;
                 state.usedGymTypes.add(state.battleType);
-                message(player, "You defeated " + state.battleName + " and earned badge " + state.badges
+                tell(state, "You defeated " + state.battleName + " and earned badge " + state.badges
                         + "! Level cap is now " + Scaling.levelCap(state.badges) + ".", Formatting.GOLD);
                 if (RogueConfig.get().healAfterGym) {
-                    CobblemonBridge.healParty(player);
+                    onlineMembers(state).forEach(CobblemonBridge::healParty);
                 }
                 state.biome = Biomes.roll(state, rng(state, 5));
-                message(player, "You travel on to the " + Biomes.get(state.biome).name + ".", Formatting.AQUA);
+                tell(state, "You travel on to the " + Biomes.get(state.biome).name + ".", Formatting.AQUA);
                 if (Scaling.championUnlocked(state.badges)) {
                     state.eliteStartFloor = state.floor;
-                    message(player, RogueConfig.get().eliteCount > 0
+                    tell(state, RogueConfig.get().eliteCount > 0
                             ? "All badges earned! The Elite Four awaits." : "All badges earned! The Champion awaits.", Formatting.LIGHT_PURPLE);
                 }
             }
@@ -746,40 +1272,60 @@ public final class RunManager {
                 state.eliteWins++;
                 state.usedEliteTypes.add(state.battleType);
                 int remaining = Math.max(0, RogueConfig.get().eliteCount - state.eliteWins);
-                message(player, "You defeated " + state.battleName + "! " + (remaining > 0
+                tell(state, "You defeated " + state.battleName + "! " + (remaining > 0
                         ? remaining + " Elite Four member" + (remaining == 1 ? "" : "s") + " left."
                         : "The Champion awaits!"), Formatting.GOLD);
                 if (RogueConfig.get().healAfterElite) {
-                    CobblemonBridge.healParty(player);
+                    onlineMembers(state).forEach(CobblemonBridge::healParty);
                 }
             }
             case LEGENDARY -> {
+                String name = state.battleName.replaceFirst("^Wild ", "");
                 if (Modifiers.has(state, Modifiers.SOLO)) {
                     int bonus = reward * 2;
                     state.money += bonus;
-                    message(player, "Solo run: " + state.battleName.replaceFirst("^Wild ", "") + " leaves you "
-                            + bonus + " bonus coins instead of joining.", Formatting.LIGHT_PURPLE);
-                    message(player, "+" + reward + " coins (" + state.money + " total).", Formatting.GOLD);
+                    tell(state, "Solo run: " + name + " leaves you " + bonus + " bonus coins instead of joining.", Formatting.LIGHT_PURPLE);
+                    tell(state, "+" + reward + " coins (" + state.money + " total).", Formatting.GOLD);
                     state.clearBattle();
                     advanceFloor(state);
                     save(player, state);
-                    openCurrent(player);
+                    onlineMembers(state).forEach(this::openCurrent);
                     return;
                 }
                 String recruit = state.battleTeam.get(0);
-                message(player, state.battleName.replaceFirst("^Wild ", "") + " was impressed by your strength and joins your team!", Formatting.LIGHT_PURPLE);
-                message(player, "+" + reward + " coins (" + state.money + " total).", Formatting.GOLD);
+                tell(state, name + " was impressed by your strength!", Formatting.LIGHT_PURPLE);
+                tell(state, "+" + reward + " coins (" + state.money + " total).", Formatting.GOLD);
                 state.clearBattle();
-                recruit(player, state, recruit);
+                if (state.isCoop()) {
+                    coopRecruit(state, recruit);
+                    advanceFloor(state);
+                    save(player, state);
+                    onlineMembers(state).forEach(this::openCurrent);
+                } else {
+                    message(player, name + " joins your team!", Formatting.LIGHT_PURPLE);
+                    recruit(player, state, recruit);
+                }
                 return;
             }
-            default -> message(player, "You defeated " + state.battleName + "!", Formatting.GREEN);
+            default -> tell(state, "You defeated " + state.battleName
+                    + (state.battleName2.isEmpty() ? "" : " and " + state.battleName2) + "!", Formatting.GREEN);
         }
-        message(player, "+" + reward + " coins (" + state.money + " total).", Formatting.GOLD);
+        tell(state, "+" + reward + " coins (" + state.money + " total).", Formatting.GOLD);
         state.clearBattle();
         advanceFloor(state);
         save(player, state);
-        openCurrent(player);
+        onlineMembers(state).forEach(this::openCurrent);
+    }
+
+    private List<ServerPlayerEntity> onlineMembers(RunState state) {
+        List<ServerPlayerEntity> result = new ArrayList<>();
+        for (UUID id : state.members()) {
+            ServerPlayerEntity member = online(id);
+            if (member != null) {
+                result.add(member);
+            }
+        }
+        return result;
     }
 
     /**
@@ -831,17 +1377,18 @@ public final class RunManager {
         if (state == null || state.battleKind != NodeType.LEGENDARY) {
             return;
         }
-        message(player, "You leave " + state.battleName.replaceFirst("^Wild ", "") + " in peace.", Formatting.GRAY);
+        tell(state, "You leave " + state.battleName.replaceFirst("^Wild ", "") + " in peace.", Formatting.GRAY);
         state.clearBattle();
         advanceFloor(state);
         save(player, state);
         openCurrent(player);
+        refreshOthers(state, player.getUuid());
     }
 
     /** Adds a rogue Pokémon to the party, going through the release screen if it's full. */
     private void recruit(ServerPlayerEntity player, RunState state, String properties) {
         state.encounterOptions.clear();
-        if (CobblemonBridge.partyMembers(player).size() >= 6) {
+        if (CobblemonBridge.partyMembers(player).size() >= partyLimit(state)) {
             state.pendingEncounter = properties;
             state.phase = Phase.RELEASE;
         } else {
@@ -867,9 +1414,13 @@ public final class RunManager {
         if (state == null) {
             return;
         }
+        if (state.isCoop()) {
+            coopChooseEncounter(player, state, index);
+            return;
+        }
         if (index >= 0 && index < state.encounterOptions.size()) {
             String picked = state.encounterOptions.get(index);
-            if (CobblemonBridge.partyMembers(player).size() >= 6) {
+            if (CobblemonBridge.partyMembers(player).size() >= partyLimit(state)) {
                 state.pendingEncounter = picked;
                 state.phase = Phase.RELEASE;
                 save(player, state);
@@ -886,6 +1437,11 @@ public final class RunManager {
 
     /** Releases a party member to make room for the pending encounter. {@code -1} keeps the party as is. */
     public void releaseForPending(ServerPlayerEntity player, int partyIndex) {
+        RunState coopState = active.get(player.getUuid());
+        if (coopState != null && coopState.isCoop()) {
+            coopRelease(player, coopState, partyIndex);
+            return;
+        }
         RunState state = requirePhase(player, Phase.RELEASE);
         if (state == null) {
             return;
